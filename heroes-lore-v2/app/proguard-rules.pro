@@ -1,2 +1,0 @@
--keep class com.heroeslore.v2.** { *; }
--dontwarn javax.microedition.**

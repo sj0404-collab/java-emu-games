@@ -1,0 +1,128 @@
+package com.heroeslore.v1
+
+import android.view.MotionEvent
+import kotlin.math.*
+
+class VirtualController {
+    // D-pad
+    private var padTouchId = -1
+    private var padCenterX = 0f
+    private var padCenterY = 0f
+    private var padRadius = 60f
+    private var dx = 0f
+    private var dy = 0f
+
+    // Buttons
+    private var attackTouchId = -1
+    private var skillTouchId = -1
+    private var menuTouchId = -1
+    private var confirmTouchId = -1
+    private var cancelTouchId = -1
+
+    var isAttacking = false
+        private set
+    var isSkill = false
+        private set
+    var isMenu = false
+        private set
+    var isConfirm = false
+        private set
+    var isCancel = false
+        private set
+
+    // Button regions
+    private data class Btn(val name: String, var x: Float, var y: Float, var r: Float)
+    private val buttons = mutableListOf<Btn>()
+
+    fun handleTouch(event: MotionEvent, screenW: Int, screenH: Int, state: Int) {
+        val padCX = 90f
+        val padCY = screenH - 100f
+        padRadius = 55f
+        padCenterX = padCX
+        padCenterY = padCY
+
+        buttons.clear()
+        // Right side buttons
+        val bx = screenW - 100f
+        val by = screenH - 140f
+        buttons.add(Btn("attack", bx, by, 32f))          // A - attack
+        buttons.add(Btn("skill", bx + 70f, by + 30f, 28f)) // B - skill
+        buttons.add(Btn("menu", screenW - 50f, 40f, 22f))  // Menu
+        buttons.add(Btn("confirm", screenW / 2f, screenH - 50f, 24f))  // OK
+        buttons.add(Btn("cancel", screenW / 2f + 60f, screenH - 50f, 24f)) // X
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                val idx = event.actionIndex
+                val px = event.getX(idx)
+                val py = event.getY(idx)
+                val pid = event.getPointerId(idx)
+
+                // Check D-pad
+                val dist = sqrt((px - padCenterX).pow(2) + (py - padCenterY).pow(2))
+                if (dist < padRadius * 1.5f && padTouchId == -1) {
+                    padTouchId = pid
+                    updateDpad(px, py)
+                    return
+                }
+
+                // Check buttons
+                for (btn in buttons) {
+                    if (sqrt((px - btn.x).pow(2) + (py - btn.y).pow(2)) < btn.r) {
+                        when (btn.name) {
+                            "attack" -> attackTouchId = pid
+                            "skill" -> skillTouchId = pid
+                            "menu" -> menuTouchId = pid
+                            "confirm" -> confirmTouchId = pid
+                            "cancel" -> cancelTouchId = pid
+                        }
+                        return
+                    }
+                }
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                for (i in 0 until event.pointerCount) {
+                    val pid = event.getPointerId(i)
+                    if (pid == padTouchId) {
+                        updateDpad(event.getX(i), event.getY(i))
+                    }
+                }
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                val idx = event.actionIndex
+                val pid = event.getPointerId(idx)
+                when (pid) {
+                    padTouchId -> { padTouchId = -1; dx = 0f; dy = 0f }
+                    attackTouchId -> { attackTouchId = -1; isAttacking = false }
+                    skillTouchId -> { skillTouchId = -1; isSkill = false }
+                    menuTouchId -> { menuTouchId = -1 }
+                    confirmTouchId -> { confirmTouchId = -1 }
+                    cancelTouchId -> { cancelTouchId = -1 }
+                }
+            }
+        }
+
+        // Set flags
+        isAttacking = attackTouchId >= 0
+        isSkill = skillTouchId >= 0
+        isMenu = menuTouchId >= 0
+        isConfirm = confirmTouchId >= 0
+        isCancel = cancelTouchId >= 0
+    }
+
+    private fun updateDpad(px: Float, py: Float) {
+        val ddx = px - padCenterX
+        val ddy = py - padCenterY
+        val dist = sqrt(ddx.pow(2) + ddy.pow(2))
+        if (dist > 0) {
+            val clamped = minOf(dist, padRadius) / padRadius
+            dx = (ddx / dist) * clamped
+            dy = (ddy / dist) * clamped
+        }
+    }
+
+    fun getDx(): Float = dx
+    fun getDy(): Float = dy
+}
