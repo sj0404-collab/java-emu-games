@@ -2,10 +2,15 @@ name: Build Unity Android APK
 
 on:
   push:
-    branches: [ main, unity ]
+    branches: [ unity, main ]
   pull_request:
-    branches: [ main ]
+    branches: [ unity, main ]
   workflow_dispatch:
+    inputs:
+      manual_run:
+        description: 'Manual trigger'
+        required: false
+        default: 'true'
 
 env:
   UNITY_VERSION: '2022.3.20f1'
@@ -61,7 +66,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/unity' && github.event_name == 'push'
     permissions:
       contents: write
 
@@ -83,7 +88,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: unity-v${{ github.run_number }}
-          name: Unity Build #${{ github.run_number }}
+          name: Heroes Lore Zero — Unity v${{ github.run_number }}
           body: |
             Heroes Lore: Zero — Unity Engine (C#)
             APK Size: ${{ steps.apk_info.outputs.size }}
