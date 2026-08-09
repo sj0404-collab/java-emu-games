@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.event.inputs.mode == 'alf-only'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,7 +33,6 @@ jobs:
             -w /workspace \
             unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
             /opt/Unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true
-
           echo "--- Generated files ---"
           find . -name '*.alf' -type f 2>/dev/null
 
@@ -62,7 +60,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: github.event.inputs.mode != 'alf-only'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,7 +69,10 @@ jobs:
         with:
           path: Library
           key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
-          restore-keys: |-\n            Library-${{ env.UNITY_VERSION }}-\n            Library-\n
+          restore-keys: |
+            Library-${{ env.UNITY_VERSION }}-
+            Library-
+
       - name: Activate Unity License
         uses: game-ci/unity-activate@v2
         with:
@@ -107,7 +107,6 @@ jobs:
     if: github.event.inputs.mode != 'alf-only' && github.ref == 'refs/heads/unity' && github.event_name == 'push'
     permissions:
       contents: write
-
     steps:
       - name: Download APK
         uses: actions/download-artifact@v4
@@ -127,9 +126,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: unity-v${{ github.run_number }}
-          name: Heroes Lore Zero — Unity v${{ github.run_number }}
+          name: Heroes Lore Zero Unity v${{ github.run_number }}
           body: |
-            Heroes Lore: Zero — Unity Engine (C#)
+            Heroes Lore: Zero Unity Engine (C#)
             APK Size: ${{ steps.apk_info.outputs.size }}
             Built with Unity ${{ env.UNITY_VERSION }}
           files: |
