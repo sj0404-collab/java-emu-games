@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags: []
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+   - 
+  - Water
+  - UI
+  - 
+  - 
+  - Tiles
+  - TileSides
+  - WaterOverlay
+  - TreeTops
+  - Entities
+  m_SortingLayers:
+  - name: Tiles
+    uniqueID: 3130628161
+    locked: 0
+  - name: TileSides
+    uniqueID: 3764959413
+    locked: 0
+  - name: WaterOverlay
+    uniqueID: 1178254811
+    locked: 0
+  - name: TreeTops
+    uniqueID: 2726522377
+    locked: 0
+  - name: Entities
+    uniqueID: 2644255703
+    locked: 0
+  - name: UI
+    uniqueID: 876157297
+    locked: 0

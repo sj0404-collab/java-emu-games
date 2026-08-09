@@ -1,0 +1,94 @@
+name: Build Unity Android APK
+
+on:
+  push:
+    branches: [ main, unity ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  UNITY_VERSION: '2022.3.20f1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
+          restore-keys: |-
+            Library-${{ env.UNITY_VERSION }}-
+            Library-
+
+      - name: Activate Unity License
+        uses: game-ci/unity-request-activation@v4
+        with:
+          licenseSecret: ${{ secrets.UNITY_LICENSE }}
+          unityVersion: ${{ env.UNITY_VERSION }}
+
+      - name: Build Unity Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          targetPlatform: Android
+          unityVersion: ${{ env.UNITY_VERSION }}
+          buildMethod: BuildScript.BuildAndroid
+          customParameters: -quit -batchmode -nographics
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HeroesLoreZero-Unity-APK
+          path: build/*.apk
+          if-no-files-found: error
+
+      - name: Revoke Unity License
+        if: always()
+        uses: game-ci/unity-request-activation@v4
+        with:
+          licenseSecret: ${{ secrets.UNITY_LICENSE }}
+          action: revoke
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: HeroesLoreZero-Unity-APK
+
+      - name: Get APK info
+        id: apk_info
+        run: |
+          APK_FILE=$(ls *.apk | head -1)
+          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
+          echo "file=$APK_FILE" >> $GITHUB_OUTPUT
+          echo "size=$APK_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: unity-v${{ github.run_number }}
+          name: Unity Build #${{ github.run_number }}
+          body: |
+            Heroes Lore: Zero — Unity Engine (C#)
+            APK Size: ${{ steps.apk_info.outputs.size }}
+            Built with Unity ${{ env.UNITY_VERSION }}
+          files: |
+            *.apk
+          draft: false
+          prerelease: false

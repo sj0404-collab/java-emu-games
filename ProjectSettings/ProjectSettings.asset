@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 23
+  m_ProductName: Heroes Lore Zero
+  m_CompanyName: HLZ
+  m_DefaultScreenOrientation: 3
+  m_TargetIOSDevices: 0
+  m_TargetAndroidDevices: 1
+  androidMinSdkVersion: 21
+  androidTargetSdkVersion: 34
+  androidInstallLocation: 1
+  androidSupportedAspectRatio: 3
+  scriptingRuntimeVersion: 2
+  apiCompatibilityLevel: 6
+  m_AndroidShowActivityIndicatorOnLoading: 0
+  m_AndroidBlurryBlackBars: 1
+  m_AndroidSplashScreenBackgroundLandscape: {r: 0.05, g: 0.05, b: 0.1, a: 1}
+  m_AndroidMaxAspectRatio: 2.1
+  androidUseCustomKeystore: 0
+  m_ScreenOrientation: 3
