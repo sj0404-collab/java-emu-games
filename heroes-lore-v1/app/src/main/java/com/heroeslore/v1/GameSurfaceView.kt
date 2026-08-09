@@ -23,6 +23,10 @@ class GameSurfaceView @JvmOverloads constructor(
     private val vPad = VirtualController()
     private val gamepad = GamepadHandler()
 
+    init {
+        holder.addCallback(this)
+    }
+
     fun initGame() {
         engine = GameEngine(width, height)
         renderer = GameRenderer(engine!!)
@@ -35,6 +39,7 @@ class GameSurfaceView @JvmOverloads constructor(
         if (width > 0 && height > 0 && engine == null) {
             initGame()
         }
+        if (engine == null) return
         running = true
         thread = Thread {
             lastTime = System.currentTimeMillis()
@@ -52,6 +57,9 @@ class GameSurfaceView @JvmOverloads constructor(
                         try {
                             ren.render(c)
                             ControllerOverlay.draw(c, width, height, eng.state, vPad)
+                        } catch (e: Exception) {
+                            // Catch rendering errors to prevent crash loop
+                            android.util.Log.e("HLZ", "Render error", e)
                         } finally {
                             holder.unlockCanvasAndPost(c)
                         }
@@ -60,8 +68,10 @@ class GameSurfaceView @JvmOverloads constructor(
                     Thread.sleep(frameTime - delta)
                 }
             }
+        }.apply {
+            name = "GameLoop"
+            start()
         }
-        thread?.start()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, fmt: Int, w: Int, h: Int) {
@@ -96,7 +106,7 @@ class GameSurfaceView @JvmOverloads constructor(
             e.inputSkill = gamepad.buttonB
             e.inputMenu = gamepad.buttonStart
             e.inputConfirm = gamepad.buttonA
-            e.inputCancel = gamepad.buttonB
+            e.inputCancel = gamepad.buttonX
         } else {
             // Virtual controller
             e.inputDx = vPad.getDx()

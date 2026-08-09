@@ -12,9 +12,11 @@ class VirtualController {
     private var dx = 0f
     private var dy = 0f
 
-    // Buttons
+    // Buttons - hold type (attack, skill)
     private var attackTouchId = -1
     private var skillTouchId = -1
+
+    // Buttons - tap type (menu, confirm, cancel) - consumed after read
     private var menuTouchId = -1
     private var confirmTouchId = -1
     private var cancelTouchId = -1
@@ -23,12 +25,27 @@ class VirtualController {
         private set
     var isSkill = false
         private set
-    var isMenu = false
-        private set
-    var isConfirm = false
-        private set
-    var isCancel = false
-        private set
+
+    // Tap buttons - read once then cleared
+    private var _menuPressed = false
+    private var _confirmPressed = false
+    private var _cancelPressed = false
+
+    val isMenu: Boolean get() {
+        val v = _menuPressed
+        _menuPressed = false
+        return v
+    }
+    val isConfirm: Boolean get() {
+        val v = _confirmPressed
+        _confirmPressed = false
+        return v
+    }
+    val isCancel: Boolean get() {
+        val v = _cancelPressed
+        _cancelPressed = false
+        return v
+    }
 
     // Button regions
     private data class Btn(val name: String, var x: Float, var y: Float, var r: Float)
@@ -72,9 +89,9 @@ class VirtualController {
                         when (btn.name) {
                             "attack" -> attackTouchId = pid
                             "skill" -> skillTouchId = pid
-                            "menu" -> menuTouchId = pid
-                            "confirm" -> confirmTouchId = pid
-                            "cancel" -> cancelTouchId = pid
+                            "menu" -> { menuTouchId = pid; _menuPressed = true }
+                            "confirm" -> { confirmTouchId = pid; _confirmPressed = true }
+                            "cancel" -> { cancelTouchId = pid; _cancelPressed = true }
                         }
                         return
                     }
@@ -97,19 +114,16 @@ class VirtualController {
                     padTouchId -> { padTouchId = -1; dx = 0f; dy = 0f }
                     attackTouchId -> { attackTouchId = -1; isAttacking = false }
                     skillTouchId -> { skillTouchId = -1; isSkill = false }
-                    menuTouchId -> { menuTouchId = -1 }
-                    confirmTouchId -> { confirmTouchId = -1 }
-                    cancelTouchId -> { cancelTouchId = -1 }
+                    menuTouchId -> menuTouchId = -1
+                    confirmTouchId -> confirmTouchId = -1
+                    cancelTouchId -> cancelTouchId = -1
                 }
             }
         }
 
-        // Set flags
+        // Set hold flags
         isAttacking = attackTouchId >= 0
         isSkill = skillTouchId >= 0
-        isMenu = menuTouchId >= 0
-        isConfirm = confirmTouchId >= 0
-        isCancel = cancelTouchId >= 0
     }
 
     private fun updateDpad(px: Float, py: Float) {

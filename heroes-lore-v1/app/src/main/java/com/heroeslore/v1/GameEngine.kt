@@ -69,9 +69,9 @@ class GameEngine(val w: Int, val h: Int) {
     }
     
     fun update() {
+        titleBlink++
         when (state) {
             GameData.ST_TITLE -> {
-                titleBlink++
                 if (inputConfirm || inputAttack) {
                     state = GameData.ST_CLASS_SEL
                 }
@@ -86,8 +86,8 @@ class GameEngine(val w: Int, val h: Int) {
             GameData.ST_PLAY -> updateGameplay()
             GameData.ST_INV -> updateInventory()
             GameData.ST_PAUSE -> {
-                if (inputConfirm) { state = GameData.ST_PLAY; inputConfirm = false }
-                if (inputCancel || inputMenu) { state = GameData.ST_PLAY; inputCancel = false; inputMenu = false }
+                if (inputConfirm) { state = GameData.ST_PLAY }
+                if (inputCancel || inputMenu) { state = GameData.ST_PLAY }
             }
             GameData.ST_DEAD -> {
                 dialogTimer++
@@ -105,6 +105,7 @@ class GameEngine(val w: Int, val h: Int) {
         // Clear single-frame inputs
         inputConfirm = false
         inputCancel = false
+        inputMenu = false
     }
     
     private fun updateGameplay() {

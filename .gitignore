@@ -1,2 +1,5 @@
 skills/
 node_modules/
+android-sdk/
+build_log*.txt
+*.apk

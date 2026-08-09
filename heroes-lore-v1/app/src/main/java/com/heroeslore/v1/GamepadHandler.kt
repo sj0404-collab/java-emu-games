@@ -12,12 +12,20 @@ class GamepadHandler {
         private set
     var leftY = 0f
         private set
-    var buttonA = false
-        private set
-    var buttonB = false
-        private set
-    var buttonStart = false
-        private set
+
+    private var _buttonA = false
+    private var _buttonB = false
+    private var _buttonStart = false
+    private var _buttonX = false  // confirm
+
+    // Edge-triggered (consumed on read)
+    private var _startPressed = false
+    private var _xPressed = false
+
+    val buttonA: Boolean get() = _buttonA
+    val buttonB: Boolean get() = _buttonB
+    val buttonStart: Boolean get() { val v = _startPressed; _startPressed = false; return v }
+    val buttonX: Boolean get() { val v = _xPressed; _xPressed = false; return v }
 
     private var deviceId = -1
 
@@ -36,24 +44,13 @@ class GamepadHandler {
     fun handleKey(event: KeyEvent): Boolean {
         if (!isConnected) return false
         if (event.deviceId != deviceId) return false
+        val down = event.action == KeyEvent.ACTION_DOWN
         when (event.keyCode) {
-            KeyEvent.KEYCODE_BUTTON_A -> {
-                buttonA = event.action == KeyEvent.ACTION_DOWN; return true
-            }
-            KeyEvent.KEYCODE_BUTTON_B -> {
-                buttonB = event.action == KeyEvent.ACTION_DOWN; return true
-            }
-            KeyEvent.KEYCODE_BUTTON_START -> {
-                buttonStart = event.action == KeyEvent.ACTION_DOWN; return true
-            }
-            KeyEvent.KEYCODE_BUTTON_X -> {
-                if (event.action == KeyEvent.ACTION_DOWN) buttonB = true
-                return true
-            }
-            KeyEvent.KEYCODE_BUTTON_Y -> {
-                if (event.action == KeyEvent.ACTION_DOWN) buttonStart = true
-                return true
-            }
+            KeyEvent.KEYCODE_BUTTON_A -> { _buttonA = down; return true }
+            KeyEvent.KEYCODE_BUTTON_B -> { _buttonB = down; return true }
+            KeyEvent.KEYCODE_BUTTON_START -> { if (down) _startPressed = true; return true }
+            KeyEvent.KEYCODE_BUTTON_X -> { if (down) _xPressed = true; return true }
+            KeyEvent.KEYCODE_BUTTON_Y -> { if (down) _startPressed = true; return true }
         }
         return false
     }
@@ -74,11 +71,11 @@ class GamepadHandler {
         if (kotlin.math.abs(leftX) < 0.15f) leftX = 0f
         if (kotlin.math.abs(leftY) < 0.15f) leftY = 0f
 
-        // L2/R2 triggers for menu/skill
+        // L2/R2 triggers
         val l2 = event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
         val r2 = event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
-        if (l2 > 0.5f) buttonStart = true
-        if (r2 > 0.5f) buttonB = true
+        if (l2 > 0.5f && !_startPressed) _startPressed = true
+        if (r2 > 0.5f) _buttonB = true
 
         return true
     }
