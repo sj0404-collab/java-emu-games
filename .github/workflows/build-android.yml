@@ -26,14 +26,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Find Unity path in container
+        run: |
+          docker run --rm unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
+            find / -name 'Unity' -type f 2>/dev/null | head -5
+          echo '---'
+          docker run --rm unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
+            ls -la /opt/Unity/ 2>/dev/null || echo 'No /opt/Unity'
+          echo '---'
+          docker run --rm unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
+            which Unity 2>/dev/null || echo 'Unity not in PATH'
+
       - name: Generate .alf via Unity Docker
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
+            --entrypoint '' \
             unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
-            /opt/Unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true
-          echo "--- Generated files ---"
+            bash -c "find / -name 'Unity' -type f -executable 2>/dev/null | head -3 > /workspace/unity_paths.txt && /opt/Unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true"
+          echo "=== Unity paths found ==="
+          cat unity_paths.txt 2>/dev/null
+          echo "=== Generated .alf files ==="
           find . -name '*.alf' -type f 2>/dev/null
 
       - name: Move .alf to known location
@@ -41,8 +55,8 @@ jobs:
         run: |
           ALF_FILE=$(find . -name '*.alf' -type f 2>/dev/null | head -1)
           if [ -z "$ALF_FILE" ]; then
-            echo "ERROR: No .alf file found"
-            find . -type f -newer /github/workspace/.git | head -20
+            echo "ERROR: No .alf file found after Docker run"
+            ls -la /workspace/ 2>/dev/null
             exit 1
           fi
           cp "$ALF_FILE" ./UnityActivation.alf
