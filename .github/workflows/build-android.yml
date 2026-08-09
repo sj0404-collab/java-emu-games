@@ -4,14 +4,64 @@ on:
   push:
     branches: [ unity, main ]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: false
+        default: 'build'
+        type: choice
+        options:
+          - build
+          - alf-only
 
 env:
   UNITY_VERSION: '2022.3.20f1'
 
 jobs:
+  generate-alf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.inputs.mode == 'alf-only'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate .alf via Unity Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
+            /opt/Unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true
+
+          echo "--- Generated files ---"
+          find . -name '*.alf' -type f 2>/dev/null
+
+      - name: Move .alf to known location
+        id: locate
+        run: |
+          ALF_FILE=$(find . -name '*.alf' -type f 2>/dev/null | head -1)
+          if [ -z "$ALF_FILE" ]; then
+            echo "ERROR: No .alf file found"
+            find . -type f -newer /github/workspace/.git | head -20
+            exit 1
+          fi
+          cp "$ALF_FILE" ./UnityActivation.alf
+          echo "path=./UnityActivation.alf" >> $GITHUB_OUTPUT
+          ls -la ./UnityActivation.alf
+
+      - name: Upload ALF file
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnityActivationFile
+          path: ./UnityActivation.alf
+          if-no-files-found: error
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    if: github.event.inputs.mode != 'alf-only'
 
     steps:
       - name: Checkout repository
@@ -22,15 +72,13 @@ jobs:
         with:
           path: Library
           key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
-          restore-keys: |-
-            Library-${{ env.UNITY_VERSION }}-
-            Library-
-
-      - name: Activate Unity License (auto)
+          restore-keys: |-\n            Library-${{ env.UNITY_VERSION }}-\n            Library-\n
+      - name: Activate Unity License
         uses: game-ci/unity-activate@v2
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
         env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
       - name: Build Unity Project
         uses: game-ci/unity-builder@v4
@@ -56,7 +104,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/unity' && github.event_name == 'push'
+    if: github.event.inputs.mode != 'alf-only' && github.ref == 'refs/heads/unity' && github.event_name == 'push'
     permissions:
       contents: write
 
