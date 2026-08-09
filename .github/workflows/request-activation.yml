@@ -1,0 +1,47 @@
+name: Request Unity ALF File
+
+on:
+  workflow_dispatch:
+    inputs:
+      unityVersion:
+        description: 'Unity version (e.g. 2022.3.20f1)'
+        required: false
+        default: '2022.3.20f1'
+
+jobs:
+  request-alf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Request Unity Activation File (.alf)
+        uses: game-ci/unity-request-activation@v4
+        id: getAlf
+        with:
+          unityVersion: ${{ github.event.inputs.unityVersion || '2022.3.20f1' }}
+
+      - name: Upload ALF file
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnityActivationFile
+          path: ${{ steps.getAlf.outputs.activationFile }}
+          if-no-files-found: error
+
+      - name: Print instructions
+        run: |
+          echo "========================================"
+          echo "  ALF file generated successfully!"
+          echo "========================================"
+          echo ""
+          echo "NEXT STEPS:"
+          echo "1. Download 'UnityActivationFile' artifact from this run"
+          echo "2. Go to https://license.unity3d.com/manual"
+          echo "3. Upload the .alf file"
+          echo "4. Select 'Unity Personal' license type"
+          echo "5. Download the .ulf license file"
+          echo "6. Add it as GitHub Secret 'UNITY_LICENSE'"
+          echo "7. Run 'Build Unity Android APK' workflow"
+          echo ""
