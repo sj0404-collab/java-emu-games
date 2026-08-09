@@ -1,0 +1,816 @@
+   226→                    npcs.add(NpcPos(7, 5, "elder"))
+   227→                    npcs.add(NpcPos(10, 3, "merchant"))
+   228→                    npcs.add(NpcPos(4, 8, "healer"))
+   229→                    npcs.add(NpcPos(12, 7, "guard"))
+   230→                }
+   231→                1 -> {
+   232→                    npcs.add(NpcPos(5, 3, "soldier"))
+   233→                }
+   234→                5 -> {
+   235→                    npcs.add(NpcPos(8, 6, "merchant"))
+   236→                    npcs.add(NpcPos(3, 4, "healer"))
+   237→                }
+   238→            }
+   239→        }
+   240→    }
+   241→
+   242→    fun loadEnemySprites(mapId: Int) {
+   243→        val enemies = mapEnemies[mapId] ?: intArrayOf(0)
+   244→        val sprites = mutableMapOf<Int, Bitmap>()
+   245→        for (eid in enemies) {
+   246→            val name = if (eid < 10) "0$eid" else "$eid"
+   247→            val bmp = AssetManager.loadMpmSingle("en/$name.mpm", 0)
+   248→            if (bmp != null) sprites[eid] = bmp
+   249→        }
+   250→        if (sprites.isNotEmpty()) enemySprites = sprites
+   251→    }
+   252→
+   253→    // ---- State transitions ----
+   254→    fun goToTitle() {
+   255→        state = STATE_TITLE
+   256→        titleSelection = 0
+   257→        splashAlpha = 0
+   258→    }
+   259→
+   260→    fun startNewGame() {
+   261→        playerHp = 100
+   262→        playerMaxHp = 100
+   263→        playerMp = 30
+   264→        playerMaxMp = 30
+   265→        playerAtk = 15
+   266→        playerDef = 8
+   267→        playerSpd = 12
+   268→        playerLevel = 1
+   269→        playerExp = 0
+   270→        playerGold = 50
+   271→        playerExpNext = 30
+   272→        playerX = 5f
+   273→        playerY = 5f
+   274→        playerDir = 0
+   275→        currentMapId = 0
+   276→        inventory.clear()
+   277→        inventory.add(Pair(0, 5))
+   278→        inventory.add(Pair(1, 3))
+   279→        loadMap(0)
+   280→        state = STATE_GAME
+   281→    }
+   282→
+   283→    fun continueGame() {
+   284→        playerHp = prefs.getInt("hp", 100)
+   285→        playerMaxHp = prefs.getInt("maxHp", 100)
+   286→        playerMp = prefs.getInt("mp", 30)
+   287→        playerMaxMp = prefs.getInt("maxMp", 30)
+   288→        playerAtk = prefs.getInt("atk", 15)
+   289→        playerDef = prefs.getInt("def", 8)
+   290→        playerSpd = prefs.getInt("spd", 12)
+   291→        playerLevel = prefs.getInt("level", 1)
+   292→        playerExp = prefs.getInt("exp", 0)
+   293→        playerGold = prefs.getInt("gold", 50)
+   294→        playerExpNext = prefs.getInt("expNext", 30)
+   295→        currentMapId = prefs.getInt("mapId", 0)
+   296→        playerX = prefs.getFloat("px", 5f)
+   297→        playerY = prefs.getFloat("py", 5f)
+   298→        playerDir = prefs.getInt("pdir", 0)
+   299→        loadMap(currentMapId)
+   300→        state = STATE_GAME
+   301→    }
+   302→
+   303→    fun saveGame() {
+   304→        prefs.edit().apply {
+   305→            putInt("hp", playerHp)
+   306→            putInt("maxHp", playerMaxHp)
+   307→            putInt("mp", playerMp)
+   308→            putInt("maxMp", playerMaxMp)
+   309→            putInt("atk", playerAtk)
+   310→            putInt("def", playerDef)
+   311→            putInt("spd", playerSpd)
+   312→            putInt("level", playerLevel)
+   313→            putInt("exp", playerExp)
+   314→            putInt("gold", playerGold)
+   315→            putInt("expNext", playerExpNext)
+   316→            putInt("mapId", currentMapId)
+   317→            putFloat("px", playerX)
+   318→            putFloat("py", playerY)
+   319→            putInt("pdir", playerDir)
+   320→            apply()
+   321→        }
+   322→    }
+   323→
+   324→    fun hasSaveData(): Boolean = prefs.contains("hp")
+   325→
+   326→    // ---- Battle system ----
+   327→    fun startBattle(enemyId: Int) {
+   328→        battleEnemyId = enemyId
+   329→        battleEnemyHp = 20 + enemyId * 15 + enemyId * enemyId * 3
+   330→        battleEnemyMaxHp = battleEnemyHp
+   331→        battleEnemyAtk = 5 + enemyId * 4
+   332→        battleTurn = 0
+   333→        battleMenuSel = 0
+   334→        battlePhase = 0
+   335→        battleMessage = "${TextData.getEnemyName(enemyId)} появляется!"
+   336→        battleMessageTimer = 60
+   337→        battlePlayerDmg = 0
+   338→        battleEnemyDmg = 0
+   339→        battleActive = true
+   340→        state = STATE_BATTLE
+   341→    }
+   342→
+   343→    fun playerAttack() {
+   344→        if (battlePhase != 0) return
+   345→        val baseDmg = playerAtk
+   346→        val variance = (Math.random() * 6 - 3).toInt()
+   347→        val crit = Math.random() < 0.15
+   348→        battlePlayerDmg = maxOf(1, baseDmg - battleEnemyAtk / 4 + variance + (if (crit) baseDmg / 2 else 0))
+   349→        battleEnemyHp = maxOf(0, battleEnemyHp - battlePlayerDmg)
+   350→        battleMessage = if (crit) "${TextData.CRITICAL_HIT} -$battlePlayerDmg" else "Атака! -$battlePlayerDmg"
+   351→        battlePhase = 1
+   352→        battleAnimTimer = 30
+   353→        if (battleEnemyHp <= 0) {
+   354→            battlePhase = 3
+   355→            battleMessage = TextData.VICTORY
+   356→            val expGain = 10 + battleEnemyId * 8
+   357→            val goldGain = 5 + battleEnemyId * 3
+   358→            playerExp += expGain
+   359→            playerGold += goldGain
+   360→            battleMessage = "$battleMessage +${expGain} ${TextData.EXP.toLowerCase()} +${goldGain} ${TextData.GOLD.toLowerCase()}"
+   361→            checkLevelUp()
+   362→            battleActive = false
+   363→        }
+   364→    }
+   365→
+   366→    fun playerMagic() {
+   367→        if (battlePhase != 0 || playerMp < 5) return
+   368→        playerMp = maxOf(0, playerMp - 5)
+   369→        battlePlayerDmg = playerAtk * 2 + (Math.random() * 10).toInt()
+   370→        battleEnemyHp = maxOf(0, battleEnemyHp - battlePlayerDmg)
+   371→        battleMessage = "Огненный шар! -$battlePlayerDmg"
+   372→        battlePhase = 1
+   373→        battleAnimTimer = 30
+   374→        if (battleEnemyHp <= 0) {
+   375→            battlePhase = 3
+   376→            battleMessage = TextData.VICTORY
+   377→            val expGain = 10 + battleEnemyId * 8
+   378→            playerExp += expGain
+   379→            checkLevelUp()
+   380→            battleActive = false
+   381→        }
+   382→    }
+   383→
+   384→    fun playerDefend() {
+   385→        if (battlePhase != 0) return
+   386→        battleMessage = "Защита! Урон снижен."
+   387→        battlePhase = 2
+   388→        battleAnimTimer = 20
+   389→    }
+   390→    fun playerUseItem() {
+   391→        if (battlePhase != 0) return
+   392→        val potIdx = inventory.indexOfFirst { it.first == 0 }
+   393→        if (potIdx >= 0) {
+   394→            val heal = 30 + playerLevel * 5
+   395→            playerHp = minOf(playerMaxHp, playerHp + heal)
+   396→            inventory[potIdx] = Pair(inventory[potIdx].first, inventory[potIdx].second - 1)
+   397→            if (inventory[potIdx].second <= 0) inventory.removeAt(potIdx)
+   398→            battleMessage = "Зелье здоровья! +$heal ${TextData.HP}"
+   399→            battlePhase = 2
+   400→            battleAnimTimer = 20
+   401→        } else {
+   402→            battleMessage = TextData.INVENTORY_FULL
+   403→        }
+   404→    }
+   405→    fun playerRun() {
+   406→        if (battlePhase != 0) return
+   407→        if (Math.random() < 0.5) {
+   408→            battleMessage = "Удалось сбежать!"
+   409→            battlePhase = 3
+   410→            battleActive = false
+   411→        } else {
+   412→            battleMessage = "Не удалось сбежать!"
+   413→            battlePhase = 2
+   414→            battleAnimTimer = 20
+   415→        }
+   416→    }
+   417→
+   418→    fun enemyTurn() {
+   419→        val baseDmg = battleEnemyAtk
+   420→        val variance = (Math.random() * 4 - 2).toInt()
+   421→        val defending = battleMessage.contains("Защита")
+   422→        battleEnemyDmg = maxOf(1, baseDmg - playerDef / 3 + variance - (if (defending) playerDef / 2 else 0))
+   423→        playerHp = maxOf(0, playerHp - battleEnemyDmg)
+   424→        battleMessage = "${TextData.getEnemyName(battleEnemyId)} атакует! -$battleEnemyDmg ${TextData.HP}"
+   425→        if (playerHp <= 0) {
+   426→            battlePhase = 4
+   427→            battleMessage = TextData.DEFEAT
+   428→            battleActive = false
+   429→        } else {
+   430→            battlePhase = 0
+   431→        }
+   432→        battleAnimTimer = 30
+   433→    }
+   434→
+   435→    fun checkLevelUp() {
+   436→        while (playerExp >= playerExpNext) {
+   437→            playerExp -= playerExpNext
+   438→            playerLevel++
+   439→            playerMaxHp += 10 + playerLevel * 2
+   440→            playerMaxMp += 3 + playerLevel
+   441→            playerAtk += 2 + playerLevel / 2
+   442→            playerDef += 1 + playerLevel / 3
+   443→            playerSpd += 1
+   444→            playerHp = playerMaxHp
+   445→            playerMp = playerMaxMp
+   446→            playerExpNext = playerLevel * 30 + playerLevel * playerLevel * 5
+   447→            battleMessage += " ${TextData.LEVEL_UP} (${TextData.LVL} $playerLevel)"
+   448→        }
+   449→    }
+   450→
+   451→    // ---- Movement ----
+   452→    fun movePlayer(dx: Float, dy: Float) {
+   453→        if (state != STATE_GAME) return
+   454→        var nx = playerX + dx
+   455→        var ny = playerY + dy
+   456→
+   457→        // Direction
+   458→        playerDir = when {
+   459→            dy > 0 -> 0
+   460→            dx < 0 -> 1
+   461→            dx > 0 -> 2
+   462→            dy < 0 -> 3
+   463→            else -> playerDir
+   464→        }
+   465→
+   466→        // Bounds
+   467→        nx = nx.coerceIn(0.5f, (mapWidth - 1.5).toFloat())
+   468→        ny = ny.coerceIn(0.5f, (mapHeight - 1.5).toFloat())
+   469→
+   470→        // Walkable check
+   471→        val tx = nx.toInt()
+   472→        val ty = ny.toInt()
+   473→        val idx = ty * mapWidth + tx
+   474→        val walk = mapWalkable
+   475→        if (walk != null && idx in walk.indices && walk[idx] == 0.toByte()) {
+   476→            // Not walkable, check NPC collision
+   477→        } else if (walk != null && idx in walk.indices) {
+   478→            playerX = nx
+   479→            playerY = ny
+   480→        }
+   481→
+   482→        playerMoving = true
+   483→
+   484→        // Check NPC interaction
+   485→        for (npc in npcs) {
+   486→ val dist = Math.sqrt(((playerX - npc.x) * (playerX - npc.x) + (playerY - npc.y) * (playerY - npc.y)).toDouble())
+   487→            if (dist < 1.5 && (dx != 0f || dy != 0f)) {
+   488→                showDialogue(TextData.getNpcDialogue(npc.id))
+   489→                // Step back
+   490→                playerX -= dx
+   491→                playerY -= dy
+   492→                return
+   493→            }
+   494→        }
+   495→
+   496→        // Random battle encounter
+   497→        if (Math.random() < 0.03) {
+   498→            val enemies = mapEnemies[currentMapId] ?: intArrayOf(0)
+   499→            val eid = enemies[(Math.random() * enemies.size).toInt()]
+   500→            startBattle(eid)
+   501→        }
+   502→
+   503→        // Map transition zones
+   504→        checkMapTransition()
+   505→    }
+   506→
+   507→    private fun checkMapTransition() {
+   508→        when (currentMapId) {
+   509→            0 -> {
+   510→                if (playerX > mapWidth - 2) { loadMap(1); playerX = 1f; }
+   511→                if (playerY < 1) { loadMap(4); playerY = (mapHeight - 2).toFloat(); }
+   512→            }
+   513→            1 -> {
+   514→                if (playerX < 1) { loadMap(0); playerX = (mapWidth - 2).toFloat(); }
+   515→                if (playerX > mapWidth - 2) { loadMap(2); playerX = 1f; }
+   516→            }
+   517→            2 -> {
+   518→                if (playerX < 1) { loadMap(1); playerX = (mapWidth - 2).toFloat(); }
+   519→                if (playerY > mapHeight - 2) { loadMap(3); playerY = 1f; }
+   520→            }
+   521→            3 -> {
+   522→                if (playerY < 1) { loadMap(2); playerY = (mapHeight - 2).toFloat(); }
+   523→            }
+   524→            4 -> {
+   525→                if (playerY > mapHeight - 2) { loadMap(0); playerY = 1f; }
+   526→                if (playerX > mapWidth - 2) { loadMap(5); playerX = 1f; }
+   527→            }
+   528→            5 -> {
+   529→                if (playerX < 1) { loadMap(4); playerX = (mapWidth - 2).toFloat(); }
+   530→            }
+   531→        }
+   532→    }
+   533→
+   534→    fun showDialogue(text: String) {
+   535→        dialogText = text
+   536→        val maxCharsPerLine = (screenW - 40) / 8
+   537→        val words = text.split(" ")
+   538→        val lines = mutableListOf<String>()
+   539→        var currentLine = StringBuilder()
+   540→        for (word in words) {
+   541→            if (currentLine.length + word.length + 1 > maxCharsPerLine && currentLine.isNotEmpty()) {
+   542→                lines.add(currentLine.toString())
+   543→                currentLine = StringBuilder()
+   544→            }
+   545→            if (currentLine.isNotEmpty()) currentLine.append(" ")
+   546→            currentLine.append(word)
+   547→        }
+   548→        if (currentLine.isNotEmpty()) lines.add(currentLine.toString())
+   549→        dialogLines = lines
+   550→        dialogLineIdx = 0
+   551→        dialogCharIdx = 0
+   552→        dialogTimer = 0
+   553→        state = STATE_DIALOG
+   554→    }
+   555→
+   556→    fun openMenu() {
+   557→        if (state != STATE_GAME) return
+   558→        menuItems = listOf(
+   559→            TextData.MENU_STATUS,
+   560→            TextData.MENU_INVENTORY,
+   561→            TextData.MENU_EQUIP,
+   562→            TextData.MENU_SAVE,
+   563→            TextData.MENU_OPTIONS,
+   564→            TextData.MENU_QUIT
+   565→        )
+   566→        menuSel = 0
+   567→        menuSubState = 0
+   568→        state = STATE_MENU
+   569→    }
+   570→
+   571→    fun handleMenuAction(action: Int) {
+   572→        if (menuSubState == 0) {
+   573→            when (menuSel) {
+   574→                0 -> menuSubState = 1 // Status
+   575→                1 -> menuSubState = 2 // Inventory
+   576→                2 -> menuSubState = 3 // Equipment
+   577→                3 -> { saveGame(); state = STATE_GAME; } // Save
+   578→                4 -> menuSubState = 4 // Options
+   579→                5 -> goToTitle() // Quit
+   580→            }
+   581→        } else {
+   582→            if (action == -1) { // Back
+   583→                if (menuSubState == 4) {
+   584→                    state = STATE_GAME
+   585→                } else {
+   586→                    menuSubState = 0
+   587→                }
+   588→            }
+   589→        }
+   590→    }
+   591→
+   592→    // ---- Update ----
+   593→    fun update() {
+   594→        frameCounter++
+   595→        if (playerMoving) {
+   596→            playerFrame = (playerFrame + 1) % 4
+   597→        } else {
+   598→            playerFrame = 0
+   599→        }
+   600→        playerMoving = false
+   601→
+   602→        when (state) {
+   603→            STATE_SPLASH -> {
+   604→                splashAlpha = minOf(255, splashAlpha + 5)
+   605→                if (splashAlpha >= 255) {
+   606→                    Thread.sleep(500)
+   607→                    goToTitle()
+   608→                }
+   609→            }
+   610→            STATE_BATTLE -> {
+   611→                if (battleAnimTimer > 0) {
+   612→                    battleAnimTimer--
+   613→                    battleShakeX = if (battleAnimTimer > 15) ((Math.random() * 6 - 3).toInt()) else 0
+   614→                    battleShakeY = if (battleAnimTimer > 15) ((Math.random() * 4 - 2).toInt()) else 0
+   615→                }
+   616→                if (battlePhase == 1 && battleAnimTimer <= 0) {
+   617→                    battlePhase = 2
+   618→                    battleAnimTimer = 20
+   619→                }
+   620→                if (battlePhase == 2 && battleAnimTimer <= 0) {
+   621→                    if (battleActive) enemyTurn()
+   622→                }
+   623→                if (battleMessageTimer > 0) battleMessageTimer--
+   624→            }
+   625→            STATE_DIALOG -> {
+   626→                dialogTimer++
+   627→                if (dialogTimer % 2 == 0 && dialogLineIdx < dialogLines.size) {
+   628→                    dialogCharIdx++
+   629→                }
+   630→            }
+   631→        }
+   632→
+   633→        // Camera follow
+   634→        val targetCamX = playerX * TILE_SIZE - screenW / 2f
+   635→        val targetCamY = playerY * TILE_SIZE - screenH / 2f
+   636→        cameraX += (targetCamX - cameraX) * 0.2f
+   637→        cameraY += (targetCamY - cameraY) * 0.2f
+   638→        cameraX = cameraX.coerceIn(0f, (mapWidth * TILE_SIZE - screenW).toFloat())
+   639→        cameraY = cameraY.coerceIn(0f, (mapHeight * TILE_SIZE - screenH).toFloat())
+   640→    }
+   641→
+   642→    // ---- Render ----
+   643→    fun render(canvas: Canvas) {
+   644→        canvas.drawPaint(paintBg)
+   645→        when (state) {
+   646→            STATE_SPLASH -> renderSplash(canvas)
+   647→            STATE_LOADING -> renderLoading(canvas)
+   648→            STATE_TITLE -> renderTitle(canvas)
+   649→            STATE_GAME -> renderGame(canvas)
+   650→            STATE_BATTLE -> renderBattle(canvas)
+   651→            STATE_MENU -> renderMenu(canvas)
+   652→            STATE_DIALOG -> renderGame(canvas); renderDialog(canvas)
+   653→        }
+   654→    }
+   655→
+   656→    private fun renderSplash(canvas: Canvas) {
+   657→        logoBmp?.let {
+   658→            val scaled = Bitmap.createScaledBitmap(it, screenW, screenH, true)
+   659→            canvas.drawBitmap(scaled, 0f, 0f, null)
+   660→            scaled.recycle()
+   661→        } ?: canvas.drawPaint(paintDarkBg)
+   662→    }
+   663→
+   664→    private fun renderLoading(canvas: Canvas) {
+   665→        canvas.drawPaint(paintDarkBg)
+   666→        paintWhite.textAlign = Paint.Align.CENTER
+   667→        canvas.drawText(TextData.LOADING, centerX.toFloat(), (centerY - 20).toFloat(), paintWhite)
+   668→        // Progress bar
+   669→        val barW = screenW - 80
+   670→        val barH = 12
+   671→        val barX = 40f
+   672→        val barY = centerY.toFloat()
+   673→        canvas.drawRect(barX, barY, barX + barW, barY + barH, paintHpBarBg)
+   674→        canvas.drawRect(barX, barY, barX + barW * loadProgress / 100f, barY + barH, paintHpBar)
+   675→        canvas.drawRect(barX, barY, barX + barW, barY + barH, paintBoxBorder)
+   676→        canvas.drawText("$loadProgress%", centerX.toFloat(), barY + barH + 25f, paintCyan)
+   677→    }
+   678→
+   679→    private fun renderTitle(canvas: Canvas) {
+   680→        canvas.drawPaint(paintDarkBg)
+   681→        paintWhite.textAlign = Paint.Align.CENTER
+   682→
+   683→        // Title text
+   684→        paintWhite.textSize = 32f
+   685→        canvas.drawText(TextData.TITLE_TEXT, centerX.toFloat(), 80f, paintWhite)
+   686→        paintYellow.textSize = 18f
+   687→        canvas.drawText(TextData.SUBTITLE, centerX.toFloat(), 115f, paintYellow)
+   688→
+   689→        // Menu options
+   690→        val menuOptions = mutableListOf(TextData.NEW_GAME)
+   691→        if (hasSaveData()) menuOptions.add(TextData.CONTINUE)
+   692→        menuOptions.add(TextData.EXIT)
+   693→
+   694→        val startY = 170f
+   695→        for (i in menuOptions.indices) {
+   696→            val y = startY + i * 35
+   697→            val isSelected = i == titleSelection
+   698→            if (isSelected) {
+   699→                canvas.drawRect(centerX - 80f, y - 16f, centerX + 80f, y + 16f, paintSelection)
+   700→                paintCyan.textAlign = Paint.Align.CENTER
+   701→                paintCyan.textSize = 20f
+   702→                canvas.drawText("> ${menuOptions[i]}", centerX.toFloat(), y + 5f, paintCyan)
+   703→            } else {
+   704→                paintWhite.textAlign = Paint.Align.CENTER
+   705→                paintWhite.textSize = 18f
+   706→                canvas.drawText(menuOptions[i], centerX.toFloat(), y + 5f, paintWhite)
+   707→            }
+   708→        }
+   709→
+   710→        // Version
+   711→        paintGreen.textAlign = Paint.Align.CENTER
+   712→        paintGreen.textSize = 10f
+   713→        canvas.drawText("v1.0.0 Kotlin", centerX.toFloat(), (screenH - 15).toFloat(), paintGreen)
+   714→    }
+   715→
+   716→    private fun renderGame(canvas: Canvas) {
+   717→        // Draw map tiles
+   718→        val ts = tileset
+   719→        val tiles = mapTiles
+   720→        if (ts != null && tiles != null) {
+   721→            val tsW = ts.width / TILE_SIZE
+   722→            val startCol = maxOf(0, (cameraX / TILE_SIZE).toInt())
+   723→            val endCol = minOf(mapWidth, ((cameraX + screenW) / TILE_SIZE).toInt() + 1)
+   724→            val startRow = maxOf(0, (cameraY / TILE_SIZE).toInt())
+   725→            val endRow = minOf(mapHeight, ((cameraY + screenH) / TILE_SIZE).toInt() + 1)
+   726→
+   727→            val srcRect = Rect()
+   728→            val dstRect = RectF()
+   729→            for (row in startRow until endRow) {
+   730→                for (col in startCol until endCol) {
+   731→                    val idx = row * mapWidth + col
+   732→                    if (idx >= tiles.size) continue
+   733→                    val tileId = tiles[idx].toInt() and 0xFF
+   734→                    if (tileId == 0) continue
+   735→
+   736→                    val srcX = (tileId % tsW) * TILE_SIZE
+   737→                    val srcY = (tileId / tsW) * TILE_SIZE
+   738→                    val dstX = col * TILE_SIZE - cameraX
+   739→                    val dstY = row * TILE_SIZE - cameraY
+   740→
+   741→                    srcRect.set(srcX, srcY, srcX + TILE_SIZE, srcY + TILE_SIZE)
+   742→                    dstRect.set(dstX, dstY, dstX + TILE_SIZE, dstY + TILE_SIZE)
+   743→                    canvas.drawBitmap(ts, srcRect, dstRect, null)
+   744→                }
+   745→            }
+   746→        } else {
+   747→            // Fallback: draw colored grid
+   748→            val startCol = maxOf(0, (cameraX / TILE_SIZE).toInt())
+   749→            val endCol = minOf(mapWidth, ((cameraX + screenW) / TILE_SIZE).toInt() + 1)
+   750→            val startRow = maxOf(0, (cameraY / TILE_SIZE).toInt())
+   751→            val endRow = minOf(mapHeight, ((cameraY + screenH) / TILE_SIZE).toInt() + 1)
+   752→            for (row in startRow until endRow) {
+   753→                for (col in startCol until endCol) {
+   754→                    val idx = row * mapWidth + col
+   755→                    val walk = mapWalkable
+   756→                    val isWalkable = walk != null && idx < walk.size && walk[idx] != 0.toByte()
+   757→                    val color = if (isWalkable) Color.parseColor("#2d5a27") else Color.parseColor("#4a3520")
+   758→                    paintBox.color = color
+   759→                    val dx = col * TILE_SIZE - cameraX
+   760→                    val dy = row * TILE_SIZE - cameraY
+   761→                    canvas.drawRect(dx, dy, dx + TILE_SIZE, dy + TILE_SIZE, paintBox)
+   762→                }
+   763→            }
+   764→        }
+   765→
+   766→        // Draw NPCs
+   767→        for (npc in npcs) {
+   768→            val nx = npc.x * TILE_SIZE - cameraX
+   769→            val ny = npc.y * TILE_SIZE - cameraY
+   770→            paintBox.color = Color.parseColor("#4488ff")
+   771→            canvas.drawRect(nx + 2, ny + 2, nx + TILE_SIZE - 2, ny + TILE_SIZE - 2, paintBox)
+   772→            paintCyan.textAlign = Paint.Align.CENTER
+   773→            paintCyan.textSize = 8f
+   774→            canvas.drawText("?", nx + TILE_SIZE / 2f, ny + TILE_SIZE / 2f + 3f, paintCyan)
+   775→        }
+   776→
+   777→        // Draw player
+   778→        val px = playerX * TILE_SIZE - cameraX
+   779→        val py = playerY * TILE_SIZE - cameraY
+   780→        heroSprites?.firstOrNull()?.let { sprite ->
+   781→            val scaled = Bitmap.createScaledBitmap(sprite, TILE_SIZE, TILE_SIZE, true)
+   782→            canvas.drawBitmap(scaled, px, py, null)
+   783→            scaled.recycle()
+   784→        } ?: run {
+   785→            // Fallback: draw colored rectangle for player
+   786→            paintBox.color = Color.parseColor("#ff4444")
+   787→            canvas.drawRect(px + 1, py + 1, px + TILE_SIZE - 1, py + TILE_SIZE - 1, paintBox)
+   788→            paintWhite.textAlign = Paint.Align.CENTER
+   789→            paintWhite.textSize = 10f
+   790→            canvas.drawText("G", px + TILE_SIZE / 2f, py + TILE_SIZE / 2f + 3f, paintWhite)
+   791→        }
+   792→
+   793→        // Draw HUD
+   794→        drawHud(canvas)
+   795→    }
+   796→
+   797→    private fun drawHud(canvas: Canvas) {
+   798→        // HP/MP bars
+   799→        val hudX = 10f
+   800→        val hudY = screenH - 40f
+   801→
+   802→        // Background
+   803→        canvas.drawRect(hudX - 2, hudY - 2, hudX + 160f, hudY + 35f, paintOverlay)
+   804→
+   805→        paintWhite.textAlign = Paint.Align.LEFT
+   806→        paintWhite.textSize = 11f
+   807→        canvas.drawText("${TextData.HP}: $playerHp/$playerMaxHp", hudX, hudY + 10f, paintWhite)
+   808→        canvas.drawRect(hudX, hudY + 14f, hudX + 100f, hudY + 20f, paintHpBarBg)
+   809→        canvas.drawRect(hudX, hudY + 14f, hudX + 100f * playerHp / playerMaxHp, hudY + 20f, paintHpBar)
+   810→
+   811→        canvas.drawText("${TextData.MP}: $playerMp/$playerMaxMp", hudX, hudY + 32f, paintCyan)
+   812→        canvas.drawRect(hudX, hudY + 35f, hudX + 100f, hudY + 41f, paintHpBarBg)
+   813→        canvas.drawRect(hudX, hudY + 35f, hudX + 100f * playerMp / playerMaxMp, hudY + 41f, paintMpBar)
+   814→
+   815→        // Gold & Level
+   816→        paintYellow.textAlign = Paint.Align.RIGHT
+   817→        paintYellow.textSize = 11f
+   818→        canvas.drawText("${TextData.LVL} $playerLevel  ${TextData.GOLD}: $playerGold", (screenW - 10).toFloat(), hudY + 10f, paintYellow)
+   819→
+   820→        // Location name
+   821→        paintGreen.textAlign = Paint.Align.RIGHT
+   822→        canvas.drawText(TextData.getLocationName(currentMapId), (screenW - 10).toFloat(), hudY + 25f, paintGreen)
+   823→
+   824→        // EXP bar
+   825→        val expX = screenW - 120f
+   826→        canvas.drawText("${TextData.EXP}:", expX, hudY + 40f, paintGreen)
+   827→        canvas.drawRect(expX + 30f, hudY + 31f, expX + 110f, hudY + 37f, paintHpBarBg)
+   828→        canvas.drawRect(expX + 30f, hudY + 31f, expX + 30f + 80f * playerExp / playerExpNext, hudY + 37f, paintYellow)
+   829→    }
+   830→
+   831→    private fun renderBattle(canvas: Canvas) {
+   832→        canvas.drawColor(Color.parseColor("#1a0a2e"))
+   833→        canvas.save()
+   834→        canvas.translate(battleShakeX.toFloat(), battleShakeY.toFloat())
+   835→
+   836→        // Ground
+   837→        canvas.drawRect(centerX - 100f, centerY + 30f, centerX + 100f, centerY + 80f, paintBox)
+   838→
+   839→        // Enemy
+   840→        val enemyBmp = enemySprites?.get(battleEnemyId)
+   841→        if (enemyBmp != null) {
+   842→            val scaled = Bitmap.createScaledBitmap(enemyBmp, 64, 64, true)
+   843→            canvas.drawBitmap(scaled, centerX - 32f, centerY - 50f, null)
+   844→            scaled.recycle()
+   845→        } else {
+   846→            paintRed.textAlign = Paint.Align.CENTER
+   847→            paintRed.textSize = 48f
+   848→            canvas.drawText(TextData.getEnemyName(battleEnemyId).firstOrNull()?.toString() ?: "?", centerX.toFloat(), (centerY - 10).toFloat(), paintRed)
+   849→        }
+   850→
+   851→        // Enemy HP bar
+   852→        val ehpX = centerX - 60f
+   853→        canvas.drawRect(ehpX, centerY - 65f, ehpX + 120f, ehpX + 8f, paintHpBarBg)
+   854→        canvas.drawRect(ehpX, centerY - 65f, ehpX + 120f * battleEnemyHp / battleEnemyMaxHp, ehpX + 8f, paintRed)
+   855→        paintWhite.textAlign = Paint.Align.CENTER
+   856→        paintWhite.textSize = 10f
+   857→        canvas.drawText("${TextData.getEnemyName(battleEnemyId)} $battleEnemyHp/$battleEnemyMaxHp", centerX.toFloat(), (centerY - 70).toFloat(), paintWhite)
+   858→
+   859→        // Player sprite (simple)
+   860→        paintBox.color = Color.parseColor("#44aaff")
+   861→        canvas.drawRect(centerX - 20f, centerY + 10f, centerX + 20f, centerY + 60f, paintBox)
+   862→        paintWhite.textAlign = Paint.Align.CENTER
+   863→        paintWhite.textSize = 16f
+   864→        canvas.drawText("Герой", centerX.toFloat(), (centerY + 42).toFloat(), paintWhite)
+   865→
+   866→        // Player HP/MP
+   867→        paintWhite.textAlign = Paint.Align.LEFT
+   868→        paintWhite.textSize = 11f
+   869→        canvas.drawText("${TextData.HP}: $playerHp/$playerMaxHp  ${TextData.MP}: $playerMp/$playerMaxMp", 20f, (screenH - 55).toFloat(), paintWhite)
+   870→
+   871→        canvas.restore()
+   872→
+   873→        // Battle menu
+   874→        if (battlePhase == 0) {
+   875→            val menuItems = listOf(TextData.ATTACK, TextData.MAGIC, TextData.DEFEND, TextData.ITEM, TextData.RUN)
+   876→            val menuX = 20f
+   877→            val menuY = screenH - 45f
+   878→            for (i in menuItems.indices) {
+   879→                val y = menuY + i * 0f // horizontal layout
+   880→                val x = menuX + i * 75f
+   881→                val isSelected = i == battleMenuSel
+   882→                paintBox.color = if (isSelected) Color.parseColor("#4a4a8a") else Color.parseColor("#2a2a4a")
+   883→                canvas.drawRect(x, y, x + 70f, y + 20f, paintBox)
+   884→                val p = if (isSelected) paintCyan else paintWhite
+   885→                p.textAlign = Paint.Align.CENTER
+   886→                p.textSize = 11f
+   887→                canvas.drawText(menuItems[i], x + 35f, y + 14f, p)
+   888→            }
+   889→        }
+   890→
+   891→        // Battle message
+   892→        if (battleMessage.isNotEmpty()) {
+   893→            val msgY = screenH - 70f
+   894→            canvas.drawRect(centerX - 150f, msgY - 12f, centerX + 150f, msgY + 12f, paintOverlay)
+   895→            paintYellow.textAlign = Paint.Align.CENTER
+   896→            paintYellow.textSize = 13f
+   897→            canvas.drawText(battleMessage, centerX.toFloat(), msgY + 4f, paintYellow)
+   898→        }
+   899→
+   900→        // Victory/defeat overlay
+   901→        if (battlePhase == 3 || battlePhase == 4) {
+   902→            canvas.drawRect(0f, 0f, screenW.toFloat(), screenH.toFloat(), paintOverlay)
+   903→            paintYellow.textAlign = Paint.Align.CENTER
+   904→            paintYellow.textSize = 28f
+   905→            canvas.drawText(if (battlePhase == 3) TextData.VICTORY else TextData.DEFEAT, centerX.toFloat(), (centerY - 20).toFloat(), paintYellow)
+   906→            paintWhite.textSize = 14f
+   907→            canvas.drawText("Нажмите для продолжения", centerX.toFloat(), (centerY + 20).toFloat(), paintWhite)
+   908→        }
+   909→    }
+   910→
+   911→    private fun renderMenu(canvas: Canvas) {
+   912→        renderGame(canvas)
+   913→        canvas.drawRect(0f, 0f, screenW.toFloat(), screenH.toFloat(), paintOverlay)
+   914→
+   915→        val menuX = centerX - 90f
+   916→        val menuY = 40f
+   917→        val menuW = 180f
+   918→
+   919→        when (menuSubState) {
+   920→            0 -> {
+   921→                // Main menu
+   922→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + menuItems.size * 30f + 10f, paintBox)
+   923→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + menuItems.size * 30f + 10f, paintBoxBorder)
+   924→                for (i in menuItems.indices) {
+   925→                    val y = menuY + 10f + i * 30f
+   926→                    if (i == menuSel) {
+   927→                        canvas.drawRect(menuX + 5f, y - 10f, menuX + menuW - 5f, y + 14f, paintSelection)
+   928→                        paintCyan.textAlign = Paint.Align.LEFT
+   929→                        paintCyan.textSize = 14f
+   930→                        canvas.drawText("> ${menuItems[i]}", menuX + 15f, y + 4f, paintCyan)
+   931→                    } else {
+   932→                        paintWhite.textAlign = Paint.Align.LEFT
+   933→                        paintWhite.textSize = 14f
+   934→                        canvas.drawText(menuItems[i], menuX + 20f, y + 4f, paintWhite)
+   935→                    }
+   936→                }
+   937→            }
+   938→            1 -> {
+   939→                // Status
+   940→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 220f, paintBox)
+   941→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 220f, paintBoxBorder)
+   942→                paintYellow.textAlign = Paint.Align.CENTER
+   943→                paintYellow.textSize = 16f
+   944→                canvas.drawText("Статус героя", centerX.toFloat(), menuY + 25f, paintYellow)
+   945→                paintWhite.textAlign = Paint.Align.LEFT
+   946→                paintWhite.textSize = 13f
+   947→                var y = menuY + 50f
+   948→                canvas.drawText("${TextData.LVL}: $playerLevel", menuX + 15f, y, paintWhite); y += 25f
+   949→                canvas.drawText("${TextData.HP}: $playerHp / $playerMaxHp", menuX + 15f, y, paintGreen); y += 25f
+   950→                canvas.drawText("${TextData.MP}: $playerMp / $playerMaxMp", menuX + 15f, y, paintCyan); y += 25f
+   951→                canvas.drawText("${TextData.ATK}: $playerAtk", menuX + 15f, y, paintRed); y += 25f
+   952→                canvas.drawText("${TextData.DEF}: $playerDef", menuX + 15f, y, paintYellow); y += 25f
+   953→                canvas.drawText("${TextData.SPD}: $playerSpd", menuX + 15f, y, paintWhite); y += 25f
+   954→                canvas.drawText("${TextData.EXP}: $playerExp / $playerExpNext", menuX + 15f, y, paintGreen); y += 25f
+   955→                canvas.drawText("${TextData.GOLD}: $playerGold", menuX + 15f, y, paintYellow)
+   956→                paintCyan.textSize = 11f
+   957→                paintCyan.textAlign = Paint.Align.CENTER
+   958→                canvas.drawText(TextData.BACK, centerX.toFloat(), menuY + 210f, paintCyan)
+   959→            }
+   960→            2 -> {
+   961→                // Inventory
+   962→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 200f, paintBox)
+   963→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 200f, paintBoxBorder)
+   964→                paintYellow.textAlign = Paint.Align.CENTER
+   965→                paintYellow.textSize = 16f
+   966→                canvas.drawText(TextData.MENU_INVENTORY, centerX.toFloat(), menuY + 25f, paintYellow)
+   967→                paintWhite.textAlign = Paint.Align.LEFT
+   968→                paintWhite.textSize = 12f
+   969→                inventory.forEachIndexed { idx, (itemId, count) ->
+   970→                    val y = menuY + 50f + idx * 22f
+   971→                    canvas.drawText("${TextData.getItemName(itemId)} x$count", menuX + 15f, y, paintWhite)
+   972→                }
+   973→                if (inventory.isEmpty()) {
+   974→                    canvas.drawText("Пусто", menuX + 15f, menuY + 55f, paintRed)
+   975→                }
+   976→                paintCyan.textSize = 11f
+   977→                paintCyan.textAlign = Paint.Align.CENTER
+   978→                canvas.drawText(TextData.BACK, centerX.toFloat(), menuY + 190f, paintCyan)
+   979→            }
+   980→            3 -> {
+   981→                // Equipment
+   982→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 160f, paintBox)
+   983→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 160f, paintBoxBorder)
+   984→                paintYellow.textAlign = Paint.Align.CENTER
+   985→                paintYellow.textSize = 16f
+   986→                canvas.drawText(TextData.MENU_EQUIP, centerX.toFloat(), menuY + 25f, paintYellow)
+   987→                paintWhite.textAlign = Paint.Align.LEFT
+   988→                paintWhite.textSize = 13f
+   989→                var y = menuY + 55f
+   990→                canvas.drawText("${TextData.SLOT_WEAPON}: ${TextData.getItemName(equippedWeapon)}", menuX + 15f, y, paintWhite); y += 25f
+   991→                canvas.drawText("${TextData.SLOT_ARMOR}: ${TextData.getItemName(equippedArmor)}", menuX + 15f, y, paintWhite)
+   992→                paintCyan.textSize = 11f
+   993→                paintCyan.textAlign = Paint.Align.CENTER
+   994→                canvas.drawText(TextData.BACK, centerX.toFloat(), menuY + 150f, paintCyan)
+   995→            }
+   996→            4 -> {
+   997→                // Options
+   998→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 120f, paintBox)
+   999→                canvas.drawRect(menuX, menuY, menuX + menuW, menuY + 120f, paintBoxBorder)
+  1000→                paintYellow.textAlign = Paint.Align.CENTER
+  1001→                paintYellow.textSize = 16f
+  1002→                canvas.drawText(TextData.MENU_OPTIONS, centerX.toFloat(), menuY + 25f, paintYellow)
+  1003→                paintWhite.textAlign = Paint.Align.CENTER
+  1004→                paintWhite.textSize = 13f
+  1005→                canvas.drawText("Виртуальные кнопки: ВКЛ", centerX.toFloat(), menuY + 55f, paintWhite)
+  1006→                canvas.drawText("Геймпад: АВТО", centerX.toFloat(), menuY + 80f, paintWhite)
+  1007→                paintCyan.textSize = 11f
+  1008→                canvas.drawText(TextData.BACK, centerX.toFloat(), menuY + 110f, paintCyan)
+  1009→            }
+  1010→        }
+  1011→    }
+  1012→
+  1013→    private fun renderDialog(canvas: Canvas) {
+  1014→        val boxX = 20f
+  1015→        val boxY = screenH - 100f
+  1016→        val boxW = screenW - 40f
+  1017→        val boxH = 85f
+  1018→        canvas.drawRect(boxX, boxY, boxX + boxW, boxY + boxH, paintBox)
+  1019→        canvas.drawRect(boxX, boxY, boxX + boxW, boxY + boxH, paintBoxBorder)
+  1020→
+  1021→        paintWhite.textAlign = Paint.Align.LEFT
+  1022→        paintWhite.textSize = 13f
+  1023→        var lineY = boxY + 20f
+  1024→        for (i in 0..minOf(dialogLineIdx, dialogLines.size - 1)) {
+  1025→            val line = dialogLines[i]
+  1026→            val displayText = if (i == dialogLineIdx) {
+  1027→                line.substring(0, minOf(dialogCharIdx, line.length))
+  1028→            } else line
+  1029→            canvas.drawText(displayText, boxX + 15f, lineY, paintWhite)
+  1030→            lineY += 20f
+  1031→        }
+  1032→
+  1033→        // Continue prompt
+  1034→        if (dialogLineIdx >= dialogLines.size - 1 && dialogCharIdx >= dialogLines.lastOrNull()?.length ?: 0) {
+  1035→            paintCyan.textAlign = Paint.Align.RIGHT
+  1036→            paintCyan.textSize = 11f
+  1037→            canvas.drawText("▼", boxX + boxW - 15f, boxY + boxH - 8f, paintCyan)
+  1038→        }
+  1039→    }
+  1040→}
+  1041→

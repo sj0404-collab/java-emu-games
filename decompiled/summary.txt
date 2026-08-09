@@ -1,0 +1,47 @@
+Summary for /home/z/my-project/upload/Heroes_Lore_Zero_vse_xkrany_hack-spaces.im.jar
+Decompiled with CFR 0.152
+
+
+ag
+----------------------------
+
+a(javax.microedition.midlet.MIDlet )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+ai
+----------------------------
+
+a(byte[] )
+  Loose catch block
+
+
+aq
+----------------------------
+
+c()
+  Unable to fully structure code
+
+
+m
+----------------------------
+
+a()
+  Unable to fully structure code
+
+
+r
+----------------------------
+
+b(byte boolean )
+  Loose catch block
+c(byte )
+  Loose catch block
+
+
+rpg.c
+----------------------------
+
+a(java.lang.String )
+  Loose catch block
