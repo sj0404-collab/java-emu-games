@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       unityVersion:
-        description: 'Unity version (e.g. 2022.3.20f1)'
+        description: 'Unity version'
         required: false
         default: '2022.3.20f1'
 
@@ -14,34 +14,34 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Generate .alf file via Unity Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            unityci/editor:ubuntu-${{ github.event.inputs.unityVersion || '2022.3.20f1' }}-base-3 \
+            /opt/Unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true
 
-      - name: Request Unity Activation File (.alf)
-        uses: game-ci/unity-request-activation@v4
-        id: getAlf
-        with:
-          unityVersion: ${{ github.event.inputs.unityVersion || '2022.3.20f1' }}
+          echo "--- Generated files ---"
+          ls -la *.alf 2>/dev/null || echo "No .alf in root, checking subdirs..."
+          find . -name '*.alf' -type f 2>/dev/null
+
+      - name: Move .alf to known location
+        run: |
+          ALF_FILE=$(find . -name '*.alf' -type f 2>/dev/null | head -1)
+          if [ -z "$ALF_FILE" ]; then
+            echo "ERROR: No .alf file found"
+            exit 1
+          fi
+          mv "$ALF_FILE" ./UnityActivation.alf
+          echo "alf_path=./UnityActivation.alf" >> $GITHUB_OUTPUT
+          echo "Found: $ALF_FILE"
+          ls -la ./UnityActivation.alf
+        id: locate_alf
 
       - name: Upload ALF file
         uses: actions/upload-artifact@v4
         with:
           name: UnityActivationFile
-          path: ${{ steps.getAlf.outputs.activationFile }}
+          path: ./UnityActivation.alf
           if-no-files-found: error
-
-      - name: Print instructions
-        run: |
-          echo "========================================"
-          echo "  ALF file generated successfully!"
-          echo "========================================"
-          echo ""
-          echo "NEXT STEPS:"
-          echo "1. Download 'UnityActivationFile' artifact from this run"
-          echo "2. Go to https://license.unity3d.com/manual"
-          echo "3. Upload the .alf file"
-          echo "4. Select 'Unity Personal' license type"
-          echo "5. Download the .ulf license file"
-          echo "6. Add it as GitHub Secret 'UNITY_LICENSE'"
-          echo "7. Run 'Build Unity Android APK' workflow"
-          echo ""
