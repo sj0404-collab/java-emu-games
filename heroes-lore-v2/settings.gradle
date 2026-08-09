@@ -1,0 +1,2 @@
+rootProject.name = 'heroes-lore-v2'
+include ':app'

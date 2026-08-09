@@ -1,0 +1,29 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
+import rpg.c;
+
+final class cv
+extends aw {
+    private dg a = null;
+
+    public cv(ah ah2, dg dg2) {
+        super(ah2, (byte)0, (byte)0, (byte)0);
+        this.a = dg2;
+    }
+
+    final boolean a(int n, int n2) {
+        if (this.b(n, n2)) {
+            return true;
+        }
+        if (ah.g(n, n2) || ah.f(n, n2)) {
+            ((ah)this).a.g();
+        }
+        return true;
+    }
+
+    protected final void a(cr cr2) {
+        this.a(cr2, false, true, rpg.c.b.a(29), false);
+        this.b(cr2, this.f, this.g + 13 + 1, this.a);
+    }
+}
