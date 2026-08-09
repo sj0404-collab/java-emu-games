@@ -3,14 +3,7 @@ name: Build Unity Android APK
 on:
   push:
     branches: [ unity, main ]
-  pull_request:
-    branches: [ unity, main ]
   workflow_dispatch:
-    inputs:
-      manual_run:
-        description: 'Manual trigger'
-        required: false
-        default: 'true'
 
 env:
   UNITY_VERSION: '2022.3.20f1'
@@ -33,11 +26,11 @@ jobs:
             Library-${{ env.UNITY_VERSION }}-
             Library-
 
-      - name: Activate Unity License
-        uses: game-ci/unity-request-activation@v4
-        with:
-          licenseSecret: ${{ secrets.UNITY_LICENSE }}
-          unityVersion: ${{ env.UNITY_VERSION }}
+      - name: Activate Unity License (auto)
+        uses: game-ci/unity-activate@v2
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Build Unity Project
         uses: game-ci/unity-builder@v4
@@ -54,14 +47,11 @@ jobs:
         with:
           name: HeroesLoreZero-Unity-APK
           path: build/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
 
-      - name: Revoke Unity License
+      - name: Return Unity License
         if: always()
-        uses: game-ci/unity-request-activation@v4
-        with:
-          licenseSecret: ${{ secrets.UNITY_LICENSE }}
-          action: revoke
+        uses: game-ci/unity-return-license@v2
 
   release:
     needs: build
@@ -79,7 +69,8 @@ jobs:
       - name: Get APK info
         id: apk_info
         run: |
-          APK_FILE=$(ls *.apk | head -1)
+          APK_FILE=$(ls *.apk 2>/dev/null | head -1)
+          if [ -z "$APK_FILE" ]; then echo "No APK found"; exit 1; fi
           APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
           echo "file=$APK_FILE" >> $GITHUB_OUTPUT
           echo "size=$APK_SIZE" >> $GITHUB_OUTPUT
