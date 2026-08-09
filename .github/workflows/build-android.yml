@@ -26,37 +26,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find Unity path in container
-        run: |
-          docker run --rm unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
-            find / -name 'Unity' -type f 2>/dev/null | head -5
-          echo '---'
-          docker run --rm unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
-            ls -la /opt/Unity/ 2>/dev/null || echo 'No /opt/Unity'
-          echo '---'
-          docker run --rm unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
-            which Unity 2>/dev/null || echo 'Unity not in PATH'
-
       - name: Generate .alf via Unity Docker
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            --entrypoint '' \
+            -v ${{ github.workspace }}:/alf_output \
             unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
-            bash -c "find / -name 'Unity' -type f -executable 2>/dev/null | head -3 > /workspace/unity_paths.txt && /opt/Unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true"
-          echo "=== Unity paths found ==="
-          cat unity_paths.txt 2>/dev/null
-          echo "=== Generated .alf files ==="
+            /opt/unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout \
+            || true
+          echo "=== Looking for .alf files ==="
           find . -name '*.alf' -type f 2>/dev/null
+          find /alf_output -name '*.alf' -type f 2>/dev/null || true
 
       - name: Move .alf to known location
         id: locate
         run: |
           ALF_FILE=$(find . -name '*.alf' -type f 2>/dev/null | head -1)
           if [ -z "$ALF_FILE" ]; then
-            echo "ERROR: No .alf file found after Docker run"
-            ls -la /workspace/ 2>/dev/null
+            echo "ERROR: No .alf file found"
+            find . -type f -name '*alf*' 2>/dev/null
             exit 1
           fi
           cp "$ALF_FILE" ./UnityActivation.alf
