@@ -30,12 +30,12 @@ jobs:
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/alf_output \
+            -w /alf_output \
             unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
             /opt/unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout \
             || true
           echo "=== Looking for .alf files ==="
           find . -name '*.alf' -type f 2>/dev/null
-          find /alf_output -name '*.alf' -type f 2>/dev/null || true
 
       - name: Move .alf to known location
         id: locate
