@@ -59,11 +59,15 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: github.event.inputs.mode != 'alf-only'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Pull Unity Docker image
+        run: |
+          docker pull unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3
 
       - name: Build APK with Unity Docker
         env:
@@ -84,7 +88,15 @@ jobs:
               -executeMethod BuildScript.BuildAndroid \
               -buildTarget Android \
               -quit \
-              -logfile /dev/stdout
+              -logfile /dev/stdout 2>&1 | tee /home/runner/build-log.txt || true
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: /home/runner/build-log.txt
+          if-no-files-found: ignore
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
