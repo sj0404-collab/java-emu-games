@@ -21,7 +21,6 @@ class GameSurfaceView @JvmOverloads constructor(
     private val targetFps = 30
     private val frameTime = 1000L / targetFps
 
-    // Virtual controller state — полностью нативный Android, без MIDlet-эмуляции
     private val vPad = VirtualController()
     private val gamepad = GamepadHandler()
     private var sensorCtrl: SensorController? = null
@@ -69,7 +68,6 @@ class GameSurfaceView @JvmOverloads constructor(
                             ren.render(c)
                             ControllerOverlay.draw(c, width, height, eng.state, vPad)
                         } catch (e: Exception) {
-                            // Catch rendering errors to prevent crash loop
                             android.util.Log.e("HLZ", "Render error", e)
                         } finally {
                             holder.unlockCanvasAndPost(c)
@@ -118,7 +116,6 @@ class GameSurfaceView @JvmOverloads constructor(
 
     private fun updateInput() {
         val e = engine ?: return
-        // 1. Геймпад — приоритет если реально шлёт данные
         val usingGamepad = gamepad.isConnected && (gamepad.leftX != 0f || gamepad.leftY != 0f || gamepad.hasAnyButton)
         if (usingGamepad) {
             e.inputDx = gamepad.leftX
@@ -130,12 +127,11 @@ class GameSurfaceView @JvmOverloads constructor(
             if (gamepad.consumeCancel()) e.inputCancel = true
             return
         }
-        // 2. Сенсор наклона — только если пад не трогают и сенсор включён
+        // sensor: safe call with let to avoid null-safety error
         val sc = sensorCtrl
-        val usingSensor = sc != null && sc.enabled && vPad.getDx() == 0f && vPad.getDy() == 0f
-        if (usingSensor) {
-            e.inputDx = sc!!.tiltX
-            e.inputDy = sc!!.tiltY
+        if (sc != null && sc.enabled && vPad.getDx() == 0f && vPad.getDy() == 0f) {
+            e.inputDx = sc.tiltX
+            e.inputDy = sc.tiltY
         } else {
             e.inputDx = vPad.getDx()
             e.inputDy = vPad.getDy()
@@ -145,7 +141,6 @@ class GameSurfaceView @JvmOverloads constructor(
         if (vPad.isMenu) e.inputMenu = true
         if (vPad.isConfirm) e.inputConfirm = true
         if (vPad.isCancel) e.inputCancel = true
-        // переключение сенсора — долгое нажатие в центре включает/выключает (обрабатывается в VirtualController)
         if (vPad.consumeToggleSensor()) {
             sc?.let { it.enabled = !it.enabled; if (it.enabled) it.start() else it.stop() }
         }
