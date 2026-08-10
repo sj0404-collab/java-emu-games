@@ -31,6 +31,7 @@ class VirtualController {
     private var _menuPressed = false
     private var _confirmPressed = false
     private var _cancelPressed = false
+    private var _toggleSensor = false
 
     val isMenu: Boolean get() {
         val v = _menuPressed
@@ -49,6 +50,7 @@ class VirtualController {
     }
 
     fun consumeSkill(): Boolean { val v = _skillEdge; _skillEdge = false; return v }
+    fun consumeToggleSensor(): Boolean { val v = _toggleSensor; _toggleSensor = false; return v }
 
     // Button regions
     private data class Btn(val name: String, var x: Float, var y: Float, var r: Float)
@@ -70,6 +72,8 @@ class VirtualController {
         buttons.add(Btn("menu", screenW - 50f, 40f, 22f))  // Menu
         buttons.add(Btn("confirm", screenW / 2f, screenH - 50f, 24f))  // OK
         buttons.add(Btn("cancel", screenW / 2f + 60f, screenH - 50f, 24f)) // X
+        // центр экрана — тап включает/выключает сенсор наклона (двойной тап не нужен — просто флаг читается в GameSurfaceView)
+        // сенсор тогглится через свайп двумя пальцами — детектим в handleTouch ниже
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {

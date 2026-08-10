@@ -21,19 +21,28 @@ class GameSurfaceView @JvmOverloads constructor(
     private val targetFps = 30
     private val frameTime = 1000L / targetFps
 
-    // Virtual controller state
+    // Virtual controller state — полностью нативный Android, без MIDlet-эмуляции
     private val vPad = VirtualController()
     private val gamepad = GamepadHandler()
+    private var sensorCtrl: SensorController? = null
 
     init {
         holder.addCallback(this)
+        isFocusable = true
+        isFocusableInTouchMode = true
     }
 
+    fun onResume() { sensorCtrl?.start() }
+    fun onPause() { sensorCtrl?.stop() }
+
     fun initGame() {
-        engine = GameEngine(width, height)
+        val w = if (width > 0) width else 800
+        val h = if (height > 0) height else 480
+        engine = GameEngine(w, h)
         renderer = GameRenderer(engine!!)
         renderer!!.loadAssets(context.assets)
         gamepad.init(context)
+        sensorCtrl = SensorController(context)
         setTag(engine)
     }
 
@@ -109,27 +118,36 @@ class GameSurfaceView @JvmOverloads constructor(
 
     private fun updateInput() {
         val e = engine ?: return
-        // Gamepad takes priority when actually providing input
+        // 1. Геймпад — приоритет если реально шлёт данные
         val usingGamepad = gamepad.isConnected && (gamepad.leftX != 0f || gamepad.leftY != 0f || gamepad.hasAnyButton)
         if (usingGamepad) {
             e.inputDx = gamepad.leftX
             e.inputDy = gamepad.leftY
             e.inputAttack = gamepad.buttonA
-            // B is skill (hold) — consume edge separately
             if (gamepad.consumeButtonB()) e.inputSkill = true
             if (gamepad.buttonStart) e.inputMenu = true
-            // A as confirm is edge via separate flag to avoid double-fire on hold
             if (gamepad.consumeConfirm()) e.inputConfirm = true
             if (gamepad.consumeCancel()) e.inputCancel = true
+            return
+        }
+        // 2. Сенсор наклона — только если пад не трогают и сенсор включён
+        val sc = sensorCtrl
+        val usingSensor = sc != null && sc.enabled && vPad.getDx() == 0f && vPad.getDy() == 0f
+        if (usingSensor) {
+            e.inputDx = sc.tiltX
+            e.inputDy = sc.tiltY
         } else {
-            // Virtual controller
             e.inputDx = vPad.getDx()
             e.inputDy = vPad.getDy()
-            e.inputAttack = vPad.isAttacking
-            if (vPad.consumeSkill()) e.inputSkill = true
-            if (vPad.isMenu) e.inputMenu = true
-            if (vPad.isConfirm) e.inputConfirm = true
-            if (vPad.isCancel) e.inputCancel = true
+        }
+        e.inputAttack = vPad.isAttacking
+        if (vPad.consumeSkill()) e.inputSkill = true
+        if (vPad.isMenu) e.inputMenu = true
+        if (vPad.isConfirm) e.inputConfirm = true
+        if (vPad.isCancel) e.inputCancel = true
+        // переключение сенсора — долгое нажатие в центре включает/выключает (обрабатывается в VirtualController)
+        if (vPad.consumeToggleSensor()) {
+            sc?.let { it.enabled = !it.enabled; if (it.enabled) it.start() else it.stop() }
         }
     }
 
