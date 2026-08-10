@@ -34,3 +34,4 @@ APK is available in the Releases section.
 dummy
 trigger
 t
+t2
