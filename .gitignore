@@ -78,3 +78,4 @@ crashlytics-build.properties
 # Keystore
 *.keystore
 *.jks
+build-log-tail.txt

@@ -66,12 +66,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull Unity Docker image
         run: |
           docker pull unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3
 
       - name: Build APK with Unity Docker
+        id: unity_build
         env:
           UNITY_EMAIL: 'memar16974@murkstar.com'
           UNITY_PASSWORD: 'Memo16974@'
@@ -90,7 +93,21 @@ jobs:
               -executeMethod BuildScript.BuildAndroid \
               -buildTarget Android \
               -quit \
-              -logfile /dev/stdout
+              -logfile /dev/stdout 2>&1 | tee build-log.txt
+
+      - name: Push build log to repo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f build-log.txt ]; then
+            tail -200 build-log.txt > build-log-tail.txt
+            git add build-log-tail.txt
+            git config user.name 'github-actions'
+            git config user.email 'actions@github.com'
+            git commit -m "Build log for run ${{ github.run_number }}" || true
+            git push origin unity
+          fi
 
       - name: Check for APK
         id: check_apk
