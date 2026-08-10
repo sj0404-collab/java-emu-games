@@ -61,6 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: github.event.inputs.mode != 'alf-only'
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -88,54 +90,32 @@ jobs:
               -executeMethod BuildScript.BuildAndroid \
               -buildTarget Android \
               -quit \
-              -logfile /dev/stdout 2>&1 | tee /home/runner/build-log.txt || true
+              -logfile /dev/stdout
 
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: /home/runner/build-log.txt
-          if-no-files-found: ignore
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: HeroesLoreZero-Unity-APK
-          path: build/*.apk
-          if-no-files-found: warn
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event.inputs.mode != 'alf-only' && github.ref == 'refs/heads/unity' && github.event_name == 'push'
-    permissions:
-      contents: write
-    steps:
-      - name: Download APK
-        uses: actions/download-artifact@v4
-        with:
-          name: HeroesLoreZero-Unity-APK
-
-      - name: Get APK info
-        id: apk_info
+      - name: Check for APK
+        id: check_apk
         run: |
-          APK_FILE=$(ls *.apk 2>/dev/null | head -1)
-          if [ -z "$APK_FILE" ]; then echo "No APK found"; exit 1; fi
-          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
-          echo "file=$APK_FILE" >> $GITHUB_OUTPUT
-          echo "size=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "=== Files in build/ ==="
+          ls -la build/ 2>/dev/null || echo "build/ dir not found"
+          echo "=== All APK files ==="
+          find . -name '*.apk' -type f 2>/dev/null
+          APK=$(find build -name '*.apk' -type f 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            SIZE=$(du -h "$APK" | cut -f1)
+            echo "file=$APK" >> $GITHUB_OUTPUT
+            echo "size=$SIZE" >> $GITHUB_OUTPUT
+            echo "APK found: $APK ($SIZE)"
+          else
+            echo "ERROR: No APK built"
+            exit 1
+          fi
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: unity-v${{ github.run_number }}
-          name: Heroes Lore Zero Unity v${{ github.run_number }}
-          body: |
-            Heroes Lore: Zero Unity Engine (C#)
-            APK Size: ${{ steps.apk_info.outputs.size }}
-            Built with Unity ${{ env.UNITY_VERSION }}
-          files: |
-            *.apk
-          draft: false
-          prerelease: false
+      - name: Create Release and Upload APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="unity-v${{ github.run_number }}"
+          gh release create "$TAG" \
+            --title "Heroes Lore Zero Unity v${{ github.run_number }}" \
+            --notes "Heroes Lore: Zero Unity Engine (C#) - Built with Unity ${{ env.UNITY_VERSION }}\nAPK Size: ${{ steps.check_apk.outputs.size }}" \
+            ${{ steps.check_apk.outputs.file }}
