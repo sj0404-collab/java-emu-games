@@ -12,9 +12,7 @@ android {
         versionCode 1
         versionName "1.0"
         // only ru + default — strip other locales
-        resourceConfigurations += listOf("ru")
-        // keep only hdpi to avoid duplicate mipmap densities
-        // aapt will still keep hdpi ic_launcher
+        resourceConfigurations += ["ru"]
     }
     signingConfigs {
         debug {
@@ -36,7 +34,6 @@ android {
             isShrinkResources = true
             isDebuggable = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // crunch pngs, strip debug
             crunchPngs = true
         }
         debug {
@@ -53,17 +50,13 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
     kotlinOptions { jvmTarget = "1.8" }
     lint { abortOnError = false; checkReleaseBuilds = false }
-    // 2 MB target — no splits, no extra jni
     packaging {
-        resources.excludes += setOf("META-INF/**")
-        // aapt leaves assets compressed (mpm/png already compressed) — keep as is
+        resources.excludes += ["META-INF/**"]
     }
     androidResources {
-        // keep only assets needed at runtime — ignore hidden
         ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 }
 dependencies {
-    // appcompat удалён — экономия ~1 MB dex, Activity вместо AppCompatActivity
     implementation("androidx.core:core-ktx:1.12.0")
 }
