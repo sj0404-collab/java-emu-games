@@ -17,45 +17,94 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Activate Unity license
-        uses: game-ci/unity-activate@v2
-        env:
-          UNITY_EMAIL: 'memar16974@murkstar.com'
-          UNITY_PASSWORD: 'Memo16974@'
-        with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-
-      - name: Build APK
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_EMAIL: 'memar16974@murkstar.com'
-          UNITY_PASSWORD: 'Memo16974@'
-        with:
-          targetPlatform: Android
-          unityVersion: ${{ env.UNITY_VERSION }}
-          buildMethod: BuildScript.BuildAndroid
-          customParameters: -username ${{ env.UNITY_EMAIL }} -password ${{ env.UNITY_PASSWORD }}
-
-      - name: Check for APK
-        id: check_apk
+      - name: Generate ALF file
         run: |
-          ls -la build/ 2>/dev/null || echo "build/ not found"
-          find . -name '*.apk' -type f 2>/dev/null
-          APK=$(find build -name '*.apk' -type f 2>/dev/null | head -1)
-          if [ -n "$APK" ]; then
-            SIZE=$(du -h "$APK" | cut -f1)
-            echo "file=$APK" >> $GITHUB_OUTPUT
-            echo "size=$SIZE" >> $GITHUB_OUTPUT
-          else
-            echo "No APK found"
-            exit 1
+          docker run --rm \
+            -v ${{ github.workspace }}:/alf_out \
+            -w /alf_out \
+            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3 \
+            /opt/unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/null || true
+          ls -la *.alf 2>/dev/null || echo 'No ALF found'
+
+      - name: Activate Unity license via API
+        run: |
+          ALF_FILE=$(ls *.alf 2>/dev/null | head -1)
+          if [ -z "$ALF_FILE" ]; then echo 'No ALF'; exit 1; fi
+          ALF_B64=$(base64 -w0 "$ALF_FILE")
+          echo "ALF: $(wc -c < "$ALF_FILE") bytes"
+          
+          curl -v -X POST 'https://license.unity3d.com/activate/serial' \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            -d "email=memar16974%40murkstar.com" \
+            -d "password=Memo16974%40" \
+            -d "serial=PERSONAL" \
+            -d "request=activation" \
+            -d "alf=$ALF_B64" \
+            -o /tmp/activate-response.txt 2>&1
+          
+          echo '=== Response ===' 
+          cat /tmp/activate-response.txt | head -c 3000
+          echo
+          
+          # Try to extract ULF
+          python3 -c "
+import json, sys
+try:
+    data = json.load(open('/tmp/activate-response.txt'))
+    if 'Result' in data and data['Result']:
+        with open('/root/.local/share/unity3d/Unity/Unity_lic.ulf', 'w') as f:
+            f.write(data['Result'])
+        print(f'ULF saved: {len(data[\"Result\"])} bytes')
+    else:
+        print(f'No ULF in response: {json.dumps(data)[:500]}')
+        sys.exit(1)
+except Exception as e:
+    print(f'Parse error: {e}')
+    sys.exit(1)
+          " || echo 'ULF extraction failed'
+
+      - name: Build APK with Unity Docker
+        run: |
+          mkdir -p /root/.local/share/unity3d/Unity
+          docker run --rm \
+            -v ${{ github.workspace }}:/project \
+            -v /root/.local/share/unity3d/Unity:/root/.local/share/unity3d/Unity:ro \
+            -w /project \
+            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3 \
+            /opt/unity/Editor/Unity \
+              -batchmode \
+              -nographics \
+              -executeMethod BuildScript.BuildAndroid \
+              -buildTarget Android \
+              -quit \
+              -logfile /dev/stdout 2>&1 | tee /tmp/build-log.txt
+
+      - name: Save build log
+        if: always()
+        run: |
+          if [ -f /tmp/build-log.txt ]; then
+            tail -100 /tmp/build-log.txt > "build-log-${{ github.run_number }}.txt"
+            git add "build-log-${{ github.run_number }}.txt" 2>/dev/null || true
+            git config user.name 'github-actions[bot]'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git commit -m "Log ${{ github.run_number }}" || true
+            git pull --rebase origin unity || true
+            git push origin unity || true
+          fi
+          if [ -f /tmp/activate-response.txt ]; then
+            cp /tmp/activate-response.txt "activation-response-${{ github.run_number }}.txt"
+            git add "activation-response-${{ github.run_number }}.txt" 2>/dev/null || true
+            git commit -m "Activation response ${{ github.run_number }}" || true
+            git push origin unity || true
           fi
 
-      - name: Release APK
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Check for APK and release
         run: |
-          gh release create "unity-v${{ github.run_number }}" \
+          APK=$(find build -name '*.apk' -type f 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then echo 'No APK built'; exit 1; fi
+          SIZE=$(du -h "$APK" | cut -f1)
+          echo "APK: $APK ($SIZE)"
+          export GH_TOKEN="${{ github.token }}"
+          gh release create "unity-v${{ github.run_number }}" "$APK" \
             --title "Heroes Lore Zero Unity v${{ github.run_number }}" \
-            --notes "Built with Unity ${{ env.UNITY_VERSION }}, Size: ${{ steps.check_apk.outputs.size }}" \
-            ${{ steps.check_apk.outputs.file }}
+            --notes "Built with Unity ${{ env.UNITY_VERSION }}, Size: $SIZE"
