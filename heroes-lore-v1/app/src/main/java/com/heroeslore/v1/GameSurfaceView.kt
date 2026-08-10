@@ -134,8 +134,8 @@ class GameSurfaceView @JvmOverloads constructor(
         val sc = sensorCtrl
         val usingSensor = sc != null && sc.enabled && vPad.getDx() == 0f && vPad.getDy() == 0f
         if (usingSensor) {
-            e.inputDx = sc.tiltX
-            e.inputDy = sc.tiltY
+            e.inputDx = sc!!.tiltX
+            e.inputDy = sc!!.tiltY
         } else {
             e.inputDx = vPad.getDx()
             e.inputDy = vPad.getDy()
