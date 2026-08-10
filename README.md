@@ -31,3 +31,4 @@ APK is available in the Releases section.
 - Procedural sprites (no external assets needed)
 - Single APK, no OBB
 
+dummy
