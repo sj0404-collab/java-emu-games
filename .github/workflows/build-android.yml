@@ -66,13 +66,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build APK with Unity Docker
+        env:
+          UNITY_EMAIL: 'memar16974@murkstar.com'
+          UNITY_PASSWORD: 'Memo16974@'
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/project \
             -w /project \
-            -e UNITY_EMAIL="${{ secrets.UNITY_EMAIL }}" \
-            -e UNITY_PASSWORD="${{ secrets.UNITY_PASSWORD }}" \
-            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
+            -e UNITY_EMAIL="$UNITY_EMAIL" \
+            -e UNITY_PASSWORD="$UNITY_PASSWORD" \
+            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3 \
             /opt/unity/Editor/Unity \
               -batchmode \
               -nographics \
