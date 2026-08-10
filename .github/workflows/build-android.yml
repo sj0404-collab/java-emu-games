@@ -72,7 +72,7 @@ jobs:
             -w /project \
             -e UNITY_EMAIL="${{ secrets.UNITY_EMAIL }}" \
             -e UNITY_PASSWORD="${{ secrets.UNITY_PASSWORD }}" \
-            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-1 \
+            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
             /opt/unity/Editor/Unity \
               -batchmode \
               -nographics \
