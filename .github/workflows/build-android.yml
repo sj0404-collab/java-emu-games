@@ -3,64 +3,14 @@ name: Build Unity Android APK
 on:
   push:
     branches: [ unity, main ]
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: 'Run mode'
-        required: false
-        default: 'build'
-        type: choice
-        options:
-          - build
-          - alf-only
 
 env:
   UNITY_VERSION: '2022.3.20f1'
 
 jobs:
-  generate-alf:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event.inputs.mode == 'alf-only'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Generate .alf via Unity Docker
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/alf_output \
-            -w /alf_output \
-            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-base-3 \
-            /opt/unity/Editor/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout \
-            || true
-          echo "=== Looking for .alf files ==="
-          find . -name '*.alf' -type f 2>/dev/null
-
-      - name: Move .alf to known location
-        id: locate
-        run: |
-          ALF_FILE=$(find . -name '*.alf' -type f 2>/dev/null | head -1)
-          if [ -z "$ALF_FILE" ]; then
-            echo "ERROR: No .alf file found"
-            find . -type f -name '*alf*' 2>/dev/null
-            exit 1
-          fi
-          cp "$ALF_FILE" ./UnityActivation.alf
-          echo "path=./UnityActivation.alf" >> $GITHUB_OUTPUT
-          ls -la ./UnityActivation.alf
-
-      - name: Upload ALF file
-        uses: actions/upload-artifact@v4
-        with:
-          name: UnityActivationFile
-          path: ./UnityActivation.alf
-          if-no-files-found: error
-
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: github.event.inputs.mode != 'alf-only'
     permissions:
       contents: write
     steps:
@@ -94,43 +44,34 @@ jobs:
               -quit \
               -logfile /dev/stdout 2>&1 | tee /tmp/build-log.txt
 
-      - name: Upload log to 0x0.st
+      - name: Upload log
         if: always()
         run: |
           if [ -f /tmp/build-log.txt ]; then
             tail -300 /tmp/build-log.txt > /tmp/build-log-tail.txt
-            echo "=== Uploading build log ==="
             curl -F 'file=@/tmp/build-log-tail.txt' https://0x0.st 2>&1 || echo 'Upload failed'
-            echo "=== Full log size: $(wc -c < /tmp/build-log.txt) bytes ==="
-          else
-            echo 'No build log file found'
           fi
 
       - name: Check for APK
         id: check_apk
         run: |
-          echo "=== Files in build/ ==="
-          ls -la build/ 2>/dev/null || echo "build/ dir not found"
-          echo "=== All APK files ==="
+          ls -la build/ 2>/dev/null || echo "build/ not found"
           find . -name '*.apk' -type f 2>/dev/null
           APK=$(find build -name '*.apk' -type f 2>/dev/null | head -1)
           if [ -n "$APK" ]; then
             SIZE=$(du -h "$APK" | cut -f1)
             echo "file=$APK" >> $GITHUB_OUTPUT
             echo "size=$SIZE" >> $GITHUB_OUTPUT
-            echo "APK found: $APK ($SIZE)"
           else
-            echo "ERROR: No APK built"
+            echo "No APK found"
             exit 1
           fi
 
-      - name: Create Release and Upload APK
+      - name: Release APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="unity-v${{ github.run_number }}"
-          gh release create "$TAG" \
+          gh release create "unity-v${{ github.run_number }}" \
             --title "Heroes Lore Zero Unity v${{ github.run_number }}" \
-            --notes "Heroes Lore: Zero Unity Engine (C#) - Built with Unity ${{ env.UNITY_VERSION }}
-APK Size: ${{ steps.check_apk.outputs.size }}" \
+            --notes "Built with Unity ${{ env.UNITY_VERSION }}, Size: ${{ steps.check_apk.outputs.size }}" \
             ${{ steps.check_apk.outputs.file }}
