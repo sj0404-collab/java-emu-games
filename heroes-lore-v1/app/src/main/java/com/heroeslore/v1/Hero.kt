@@ -70,21 +70,26 @@ class Hero(clsId: Int) {
     }
     
     fun useItem(id: Int): Boolean {
-        val item = GameData.ITEMS[id] ?: return false
+        val item = GameData.ITEMS.getOrNull(id) ?: return false
         if (item.type == 0) { // consumable
-            if (item.value > 0 && item.name.contains("HP")) {
-                hp = minOf(hp + item.value, maxHp)
-            } else if (item.name.contains("МП")) {
-                mp = minOf(mp + item.value, maxMp)
+            // id 0,1 = HP potions, id 2 = MP potion (see GameData)
+            when (id) {
+                0, 1 -> hp = minOf(hp + item.value, maxHp)
+                2 -> mp = minOf(mp + item.value, maxMp)
+                else -> {
+                    if (item.name.contains("HP")) hp = minOf(hp + item.value, maxHp)
+                    else if (item.name.contains("MP") || item.name.contains("МП")) mp = minOf(mp + item.value, maxMp)
+                    else hp = minOf(hp + item.value, maxHp)
+                }
             }
-            inventory.remove(id)
+            inventory.remove(Integer.valueOf(id))
             return true
         }
         return false
     }
     
     fun equipItem(id: Int) {
-        val item = GameData.ITEMS[id] ?: return
+        val item = GameData.ITEMS.getOrNull(id) ?: return
         val slot = when (item.type) {
             1 -> 0 // weapon
             2 -> 1 // armor
@@ -94,7 +99,7 @@ class Hero(clsId: Int) {
         // Unequip old
         if (equipment[slot] >= 0) {
             inventory.add(equipment[slot])
-            val old = GameData.ITEMS[equipment[slot]]!!
+            val old = GameData.ITEMS.getOrNull(equipment[slot]) ?: return
             when (slot) {
                 0 -> bonusAtk -= old.value
                 1 -> bonusDef -= old.value
@@ -102,7 +107,7 @@ class Hero(clsId: Int) {
             }
         }
         equipment[slot] = id
-        inventory.remove(id)
+        inventory.remove(Integer.valueOf(id))
         when (slot) {
             0 -> bonusAtk += item.value
             1 -> bonusDef += item.value

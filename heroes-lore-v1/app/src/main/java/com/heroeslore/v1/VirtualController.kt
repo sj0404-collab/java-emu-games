@@ -15,6 +15,7 @@ class VirtualController {
     // Buttons - hold type (attack, skill)
     private var attackTouchId = -1
     private var skillTouchId = -1
+    private var _skillEdge = false
 
     // Buttons - tap type (menu, confirm, cancel) - consumed after read
     private var menuTouchId = -1
@@ -47,6 +48,8 @@ class VirtualController {
         return v
     }
 
+    fun consumeSkill(): Boolean { val v = _skillEdge; _skillEdge = false; return v }
+
     // Button regions
     private data class Btn(val name: String, var x: Float, var y: Float, var r: Float)
     private val buttons = mutableListOf<Btn>()
@@ -75,7 +78,7 @@ class VirtualController {
                 val py = event.getY(idx)
                 val pid = event.getPointerId(idx)
 
-                // Check D-pad
+                // Check D-pad first
                 val dist = sqrt((px - padCenterX).pow(2) + (py - padCenterY).pow(2))
                 if (dist < padRadius * 1.5f && padTouchId == -1) {
                     padTouchId = pid
@@ -88,7 +91,7 @@ class VirtualController {
                     if (sqrt((px - btn.x).pow(2) + (py - btn.y).pow(2)) < btn.r) {
                         when (btn.name) {
                             "attack" -> attackTouchId = pid
-                            "skill" -> skillTouchId = pid
+                            "skill" -> { skillTouchId = pid; _skillEdge = true; isSkill = true }
                             "menu" -> { menuTouchId = pid; _menuPressed = true }
                             "confirm" -> { confirmTouchId = pid; _confirmPressed = true }
                             "cancel" -> { cancelTouchId = pid; _cancelPressed = true }
@@ -107,7 +110,7 @@ class VirtualController {
                 }
             }
 
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                 val idx = event.actionIndex
                 val pid = event.getPointerId(idx)
                 when (pid) {
@@ -118,10 +121,17 @@ class VirtualController {
                     confirmTouchId -> confirmTouchId = -1
                     cancelTouchId -> cancelTouchId = -1
                 }
+                // ACTION_CANCEL means all pointers cancelled
+                if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                    padTouchId = -1; dx = 0f; dy = 0f
+                    attackTouchId = -1; isAttacking = false
+                    skillTouchId = -1; isSkill = false
+                    menuTouchId = -1; confirmTouchId = -1; cancelTouchId = -1
+                }
             }
         }
 
-        // Set hold flags
+        // Set hold flags (attack is hold, skill hold for UI highlight)
         isAttacking = attackTouchId >= 0
         isSkill = skillTouchId >= 0
     }

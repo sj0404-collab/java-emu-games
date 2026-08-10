@@ -18,6 +18,9 @@ class GameEngine(val w: Int, val h: Int) {
     var titleBlink: Int = 0
     var killCount: Int = 0
     var totalKills: Int = 10
+    private var invCooldown: Int = 0
+    private var classCooldown: Int = 0
+    private var mpRegenTick: Int = 0
     
     // Input state
     var inputDx: Float = 0f
@@ -70,16 +73,21 @@ class GameEngine(val w: Int, val h: Int) {
     
     fun update() {
         titleBlink++
+        if (classCooldown > 0) classCooldown--
+        if (invCooldown > 0) invCooldown--
         when (state) {
             GameData.ST_TITLE -> {
-                if (inputConfirm || inputAttack) {
+                if (inputConfirm) {
                     state = GameData.ST_CLASS_SEL
+                    classCooldown = 12
                 }
             }
             GameData.ST_CLASS_SEL -> {
-                if (inputDy > 0.3f) { classSelIndex = (classSelIndex + 1) % GameData.CLASSES.size; inputDy = 0f }
-                if (inputDy < -0.3f) { classSelIndex = (classSelIndex - 1 + GameData.CLASSES.size) % GameData.CLASSES.size; inputDy = 0f }
-                if (inputConfirm || inputAttack) {
+                if (classCooldown == 0) {
+                    if (inputDy > 0.5f) { classSelIndex = (classSelIndex + 1) % GameData.CLASSES.size; classCooldown = 10 }
+                    else if (inputDy < -0.5f) { classSelIndex = (classSelIndex - 1 + GameData.CLASSES.size) % GameData.CLASSES.size; classCooldown = 10 }
+                }
+                if (inputConfirm && classCooldown == 0) {
                     startGame(classSelIndex)
                 }
             }
@@ -200,9 +208,11 @@ class GameEngine(val w: Int, val h: Int) {
             h.attacking = false
         }
         
-        // Skill use
+        // Skill use (edge-triggered)
         if (inputSkill && h.attackCd <= 0) {
-            val sk = GameData.SKILLS.getOrNull(h.learnedSkills.lastOrNull() ?: 0) ?: return
+            inputSkill = false
+            val skillId = h.learnedSkills.lastOrNull() ?: 0
+            val sk = GameData.SKILLS.firstOrNull { it.id == skillId } ?: GameData.SKILLS.getOrNull(skillId) ?: return
             if (h.mp >= sk.mp) {
                 h.mp -= sk.mp
                 h.attackCd = 20
@@ -229,7 +239,6 @@ class GameEngine(val w: Int, val h: Int) {
             } else {
                 floatTexts.add(FloatText(GameData.T.NO_MP, h.x, h.y - 1f, 0xFF0000.toInt()))
             }
-            inputSkill = false
         }
         
         // Pick up drops
@@ -265,9 +274,13 @@ class GameEngine(val w: Int, val h: Int) {
         cameraX += (isoX - w / 2f - cameraX) * 0.1f
         cameraY += (isoY - this.h / 2f - cameraY) * 0.1f
         
-        // MP regen
-        if (h.hp > 0 && h.attackTimer <= 0) {
-            h.mp = minOf(h.mp + 1, h.maxMp)
+        // MP regen — throttled (1 MP per ~10 frames)
+        mpRegenTick++
+        if (mpRegenTick >= 10) {
+            mpRegenTick = 0
+            if (h.hp > 0 && h.attackTimer <= 0) {
+                h.mp = minOf(h.mp + 1, h.maxMp)
+            }
         }
         
         // Death check
@@ -297,18 +310,21 @@ class GameEngine(val w: Int, val h: Int) {
         }
         val inv = h.inventory
         if (inv.isNotEmpty()) {
-            if (inputDy > 0.3f) { invScroll = (invScroll + 1) % inv.size; inputDy = 0f }
-            if (inputDy < -0.3f) { invScroll = (invScroll - 1 + inv.size) % inv.size; inputDy = 0f }
+            if (invCooldown == 0) {
+                if (inputDy > 0.5f) { invScroll = (invScroll + 1) % inv.size; invCooldown = 10 }
+                else if (inputDy < -0.5f) { invScroll = (invScroll - 1 + inv.size) % inv.size; invCooldown = 10 }
+            }
             if (inputConfirm && invScroll < inv.size) {
                 val itemId = inv[invScroll]
                 val item = GameData.ITEMS[itemId]
                 if (item.type == 0) {
                     h.useItem(itemId)
-                    if (invScroll >= inv.size) invScroll = maxOf(0, inv.size - 1)
                 } else {
                     h.equipItem(itemId)
-                    if (invScroll >= inv.size) invScroll = maxOf(0, inv.size - 1)
                 }
+                if (invScroll >= inv.size) invScroll = maxOf(0, inv.size - 1)
+                inputConfirm = false
+                invCooldown = 10
             }
         }
         inputConfirm = false

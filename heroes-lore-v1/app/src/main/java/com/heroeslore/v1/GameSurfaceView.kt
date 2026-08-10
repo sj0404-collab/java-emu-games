@@ -13,7 +13,9 @@ class GameSurfaceView @JvmOverloads constructor(
 
     private var engine: GameEngine? = null
     private var renderer: GameRenderer? = null
+    @Volatile
     private var thread: Thread? = null
+    @Volatile
     private var running = false
     private var lastTime = 0L
     private val targetFps = 30
@@ -76,14 +78,22 @@ class GameSurfaceView @JvmOverloads constructor(
 
     override fun surfaceChanged(holder: SurfaceHolder, fmt: Int, w: Int, h: Int) {
         engine?.let {
-            // Update engine dimensions if resized
             if (it.w != w || it.h != h) {
                 val newEngine = GameEngine(w, h)
                 newEngine.state = it.state
                 newEngine.hero = it.hero
                 newEngine.enemies.addAll(it.enemies)
+                newEngine.floatTexts.addAll(it.floatTexts)
+                newEngine.drops.addAll(it.drops)
                 newEngine.classSelIndex = it.classSelIndex
+                newEngine.invScroll = it.invScroll
                 newEngine.killCount = it.killCount
+                newEngine.totalKills = it.totalKills
+                newEngine.cameraX = it.cameraX
+                newEngine.cameraY = it.cameraY
+                newEngine.dialogText = it.dialogText
+                newEngine.dialogTimer = it.dialogTimer
+                newEngine.titleBlink = it.titleBlink
                 engine = newEngine
                 renderer = GameRenderer(newEngine)
                 renderer!!.loadAssets(context.assets)
@@ -93,29 +103,33 @@ class GameSurfaceView @JvmOverloads constructor(
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         running = false
-        thread?.join(5000)
+        try { thread?.join(1000) } catch (_: InterruptedException) {}
+        thread = null
     }
 
     private fun updateInput() {
         val e = engine ?: return
-        // Gamepad takes priority
-        if (gamepad.isConnected) {
+        // Gamepad takes priority when actually providing input
+        val usingGamepad = gamepad.isConnected && (gamepad.leftX != 0f || gamepad.leftY != 0f || gamepad.hasAnyButton)
+        if (usingGamepad) {
             e.inputDx = gamepad.leftX
             e.inputDy = gamepad.leftY
             e.inputAttack = gamepad.buttonA
-            e.inputSkill = gamepad.buttonB
-            e.inputMenu = gamepad.buttonStart
-            e.inputConfirm = gamepad.buttonA
-            e.inputCancel = gamepad.buttonX
+            // B is skill (hold) — consume edge separately
+            if (gamepad.consumeButtonB()) e.inputSkill = true
+            if (gamepad.buttonStart) e.inputMenu = true
+            // A as confirm is edge via separate flag to avoid double-fire on hold
+            if (gamepad.consumeConfirm()) e.inputConfirm = true
+            if (gamepad.consumeCancel()) e.inputCancel = true
         } else {
             // Virtual controller
             e.inputDx = vPad.getDx()
             e.inputDy = vPad.getDy()
             e.inputAttack = vPad.isAttacking
-            e.inputSkill = vPad.isSkill
-            e.inputMenu = vPad.isMenu
-            e.inputConfirm = vPad.isConfirm
-            e.inputCancel = vPad.isCancel
+            if (vPad.consumeSkill()) e.inputSkill = true
+            if (vPad.isMenu) e.inputMenu = true
+            if (vPad.isConfirm) e.inputConfirm = true
+            if (vPad.isCancel) e.inputCancel = true
         }
     }
 

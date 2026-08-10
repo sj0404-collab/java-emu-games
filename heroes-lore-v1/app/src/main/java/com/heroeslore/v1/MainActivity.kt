@@ -25,30 +25,32 @@ class MainActivity : Activity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        // Physical keyboard / gamepad fallback
+        // Let GamepadHandler try first (it knows gamepad keys)
+        if (gameView.onGamepadKeyEvent(event)) return true
         val eng = (gameView.getTag() as? GameEngine) ?: return super.onKeyDown(keyCode, event)
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> eng.inputDy = -1f
             KeyEvent.KEYCODE_DPAD_DOWN -> eng.inputDy = 1f
             KeyEvent.KEYCODE_DPAD_LEFT -> eng.inputDx = -1f
             KeyEvent.KEYCODE_DPAD_RIGHT -> eng.inputDx = 1f
-            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_ENTER -> eng.inputAttack = true
-            KeyEvent.KEYCODE_B -> eng.inputSkill = true
+            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_ENTER -> eng.inputConfirm = true
+            KeyEvent.KEYCODE_Z -> eng.inputAttack = true
+            KeyEvent.KEYCODE_X, KeyEvent.KEYCODE_B -> eng.inputSkill = true
             KeyEvent.KEYCODE_M, KeyEvent.KEYCODE_MENU -> eng.inputMenu = true
-            KeyEvent.KEYCODE_I -> { eng.inputMenu = true; if (eng.state == GameData.ST_PLAY) eng.state = GameData.ST_INV }
-            KeyEvent.KEYCODE_ESCAPE -> eng.inputCancel = true
+            KeyEvent.KEYCODE_I -> { if (eng.state == GameData.ST_PLAY) eng.state = GameData.ST_INV else eng.inputMenu = true }
+            KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_BACK -> eng.inputCancel = true
         }
-        if (gameView.onGamepadKeyEvent(event)) return true
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (gameView.onGamepadKeyEvent(event)) return true
         val eng = (gameView.getTag() as? GameEngine) ?: return super.onKeyUp(keyCode, event)
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> eng.inputDy = 0f
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> eng.inputDx = 0f
+            KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_SPACE -> eng.inputAttack = false
         }
-        if (gameView.onGamepadKeyEvent(event)) return true
         return super.onKeyUp(keyCode, event)
     }
 

@@ -22,13 +22,15 @@ jobs:
 
       - name: Create signing keystore
         run: keytool -genkeypair -keystore keystore.jks -alias hl -keyalg RSA -keysize 2048 -validity 10000 -storepass heroes123 -keypass heroes123 -dname 'CN=HL,O=GD,C=RU'
+        working-directory: heroes-lore-v1
 
       - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon
+        working-directory: heroes-lore-v1
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: heroes-lore-zero-v1
-          path: app/build/outputs/apk/release/*.apk
+          path: heroes-lore-v1/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
