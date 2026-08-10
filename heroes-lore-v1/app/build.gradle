@@ -50,17 +50,19 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget "1.8"
     }
     lint {
         abortOnError false
         checkReleaseBuilds false
     }
     packaging {
-        resources.excludes += ["META-INF/**"]
+        resources {
+            excludes += ["META-INF/**"]
+        }
     }
     androidResources {
-        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+        ignoreAssetsPattern "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 }
 dependencies {
