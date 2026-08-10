@@ -11,12 +11,10 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
-        // only ru + default — strip other locales
         resourceConfigurations += ["ru"]
     }
     signingConfigs {
         debug {
-            // standard Android debug keystore
         }
         release {
             storeFile file(System.getenv('KEYSTORE_PATH') ?: 'keystore.jks')
@@ -30,26 +28,34 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            isMinifyEnabled = true
-            isShrinkResources = true
-            isDebuggable = false
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            crunchPngs = true
+            crunchPngs true
         }
         debug {
             signingConfig signingConfigs.debug
-            isMinifyEnabled = true
-            isShrinkResources = true
-            isDebuggable = true
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            minifyEnabled true
+            shrinkResources true
+            debuggable true
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            crunchPngs = true
+            crunchPngs true
         }
     }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
-    kotlinOptions { jvmTarget = "1.8" }
-    lint { abortOnError = false; checkReleaseBuilds = false }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
     packaging {
         resources.excludes += ["META-INF/**"]
     }
@@ -58,5 +64,5 @@ android {
     }
 }
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation "androidx.core:core-ktx:1.12.0"
 }
