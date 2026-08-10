@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Pull Unity Docker image
         run: |
@@ -44,12 +46,21 @@ jobs:
               -quit \
               -logfile /dev/stdout 2>&1 | tee /tmp/build-log.txt
 
-      - name: Upload log
+      - name: Save log to repo
         if: always()
         run: |
           if [ -f /tmp/build-log.txt ]; then
-            tail -300 /tmp/build-log.txt > /tmp/build-log-tail.txt
-            curl -F 'file=@/tmp/build-log-tail.txt' https://0x0.st 2>&1 || echo 'Upload failed'
+            LOG_SIZE=$(wc -c < /tmp/build-log.txt)
+            echo "Log size: $LOG_SIZE bytes"
+            tail -200 /tmp/build-log.txt > "build-log-${{ github.run_number }}.txt"
+            git add "build-log-${{ github.run_number }}.txt"
+            git config user.name 'github-actions[bot]'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git commit -m "Add build log for run ${{ github.run_number }}" || true
+            git pull --rebase origin unity || true
+            git push origin unity || true
+          else
+            echo 'No build log file found'
           fi
 
       - name: Check for APK
