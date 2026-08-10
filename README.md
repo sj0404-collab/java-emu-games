@@ -32,3 +32,4 @@ APK is available in the Releases section.
 - Single APK, no OBB
 
 dummy
+trigger

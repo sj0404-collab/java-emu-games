@@ -16,52 +16,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - name: Pull Unity Docker image
-        run: |
-          docker pull unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3
-
-      - name: Build APK with Unity Docker
-        id: unity_build
+      - name: Activate Unity license
+        uses: game-ci/unity-activate@v2
         env:
           UNITY_EMAIL: 'memar16974@murkstar.com'
           UNITY_PASSWORD: 'Memo16974@'
-        run: |
-          set -o pipefail
-          docker run --rm \
-            -v ${{ github.workspace }}:/project \
-            -w /project \
-            -e UNITY_EMAIL="$UNITY_EMAIL" \
-            -e UNITY_PASSWORD="$UNITY_PASSWORD" \
-            unityci/editor:ubuntu-${{ env.UNITY_VERSION }}-android-3 \
-            /opt/unity/Editor/Unity \
-              -batchmode \
-              -nographics \
-              -username "$UNITY_EMAIL" \
-              -password "$UNITY_PASSWORD" \
-              -executeMethod BuildScript.BuildAndroid \
-              -buildTarget Android \
-              -quit \
-              -logfile /dev/stdout 2>&1 | tee /tmp/build-log.txt
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
 
-      - name: Save log to repo
-        if: always()
-        run: |
-          if [ -f /tmp/build-log.txt ]; then
-            LOG_SIZE=$(wc -c < /tmp/build-log.txt)
-            echo "Log size: $LOG_SIZE bytes"
-            tail -200 /tmp/build-log.txt > "build-log-${{ github.run_number }}.txt"
-            git add "build-log-${{ github.run_number }}.txt"
-            git config user.name 'github-actions[bot]'
-            git config user.email 'github-actions[bot]@users.noreply.github.com'
-            git commit -m "Add build log for run ${{ github.run_number }}" || true
-            git pull --rebase origin unity || true
-            git push origin unity || true
-          else
-            echo 'No build log file found'
-          fi
+      - name: Build APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: 'memar16974@murkstar.com'
+          UNITY_PASSWORD: 'Memo16974@'
+        with:
+          targetPlatform: Android
+          unityVersion: ${{ env.UNITY_VERSION }}
+          buildMethod: BuildScript.BuildAndroid
+          customParameters: -username ${{ env.UNITY_EMAIL }} -password ${{ env.UNITY_PASSWORD }}
 
       - name: Check for APK
         id: check_apk
