@@ -30,3 +30,4 @@ APK is available in the Releases section.
 - C# (IL2CPP for Android)
 - Procedural sprites (no external assets needed)
 - Single APK, no OBB
+
