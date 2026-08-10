@@ -3,6 +3,8 @@ name: Build APK
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -20,15 +22,32 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create signing keystore
-        run: keytool -genkeypair -keystore keystore.jks -alias hl -keyalg RSA -keysize 2048 -validity 10000 -storepass heroes123 -keypass heroes123 -dname 'CN=HL,O=GD,C=RU'
+      - name: Build DEBUG APK (debug key, сенсорное управление)
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: heroes-lore-v1
 
-      - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon
+      - name: Build RELEASE APK (if keystore exists, else unsigned)
+        run: |
+          if [ -f keystore.jks ]; then
+            echo "keystore found — building signed release"
+            ./gradlew assembleRelease --no-daemon
+          else
+            echo "no keystore — generating temp debug keystore for release"
+            keytool -genkeypair -keystore keystore.jks -alias hl -keyalg RSA -keysize 2048 -validity 10000 -storepass heroes123 -keypass heroes123 -dname 'CN=HL,O=GD,C=RU'
+            ./gradlew assembleRelease --no-daemon
+          fi
+        working-directory: heroes-lore-v1
 
-      - name: Upload APK
+      - name: Upload DEBUG APK (нативный, без MIDlet)
         uses: actions/upload-artifact@v4
         with:
-          name: heroes-lore-zero-v1
-          path: app/build/outputs/apk/release/*.apk
+          name: heroes-lore-zero-v1-debug
+          path: heroes-lore-v1/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload RELEASE APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: heroes-lore-zero-v1-release
+          path: heroes-lore-v1/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
