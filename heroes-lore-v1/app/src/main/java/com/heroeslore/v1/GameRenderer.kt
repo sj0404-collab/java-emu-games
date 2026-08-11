@@ -26,9 +26,13 @@ class GameRenderer(val engine: GameEngine) {
 
     private var titleBmp: Bitmap? = null
     private var faceBmps = arrayOfNulls<Bitmap>(3)
+    private var heroSheets = arrayOfNulls<SpriteSheet>(6)
     
     fun loadAssets(am: android.content.res.AssetManager) {
         try { titleBmp = BitmapFactory.decodeStream(am.open("title.png")) } catch(_: Exception) {}
+        for (i in 0..5) {
+            heroSheets[i] = SpriteSheet.load(am, "sprites/sheet_hero_${arrayOf("warrior", "assassin", "knight", "ranger", "gunblade", "mage")[i]}.png")
+        }
         for (i in 0..2) {
             try { faceBmps[i] = BitmapFactory.decodeStream(am.open("img/face_${i}.png")) } catch(_: Exception) {}
         }
@@ -243,6 +247,12 @@ class GameRenderer(val engine: GameEngine) {
         // Shadow
         paint.color = Color.argb(80, 0, 0, 0)
         canvas.drawOval(sx - 10f, sy - 2f, sx + 10f, sy + 4f, paint)
+
+        // Native 4x4 sprite sheet takes precedence over the old placeholder drawing.
+        heroSheets.getOrNull(h.clsId)?.let {
+            it.draw(canvas, sx, sy + 4f, 42f, h.dir, h.animFrame, paint)
+            return
+        }
 
         // Flash red when hurt
         val isHurt = h.hurtTimer > 0 && (h.hurtTimer / 2) % 2 == 0
