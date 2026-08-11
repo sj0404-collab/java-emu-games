@@ -1,0 +1,26 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+
+MODEL="${LOCAL_AI_GGUF:-$HOME/.local-ai/models/Qwen_Qwen3-0.6B-Q4_K_M.gguf}"
+LLAMA="${LOCAL_AI_LLAMA_CLI:-llama-cli}"
+CONTEXT="${LOCAL_AI_CONTEXT:-2048}"
+THREADS="${LOCAL_AI_THREADS:-$(nproc 2>/dev/null || echo 4)}"
+
+if ! command -v "$LLAMA" >/dev/null 2>&1; then
+  echo "llama-cli не найден. Запустите: bash scripts/termux-setup.sh" >&2
+  exit 1
+fi
+
+if [[ ! -f "$MODEL" ]]; then
+  echo "Модель не найдена: $MODEL" >&2
+  echo "Запустите: bash scripts/termux-setup.sh" >&2
+  exit 1
+fi
+
+exec "$LLAMA" \
+  --model "$MODEL" \
+  --ctx-size "$CONTEXT" \
+  --threads "$THREADS" \
+  --conversation \
+  --color \
+  "$@"
