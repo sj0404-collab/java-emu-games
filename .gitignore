@@ -9,3 +9,7 @@ models/
 android-sdk/
 build_log*.txt
 *.apk
+android/.gradle/
+android/local.properties
+android/app/build/
+android/vendor/

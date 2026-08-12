@@ -9,6 +9,11 @@ import {
   MODEL_PRESETS,
   resolveModel,
 } from '../shared/models.js';
+import {
+  PROFILE_PRESETS,
+  profileSystemPrompt,
+  profileTemperature,
+} from '../shared/profiles.js';
 
 const VERSION = '0.1.0';
 const KNOWN_COMMANDS = new Set(['chat', 'serve', 'download', 'models', 'help']);
@@ -23,6 +28,9 @@ async function main() {
   const parsed = parseArguments(process.argv.slice(2));
   const command = parsed.command;
   const options = parsed.options;
+  if (options.profile && !PROFILE_PRESETS.some((profile) => profile.id === options.profile)) {
+    throw new Error(`Неизвестный профиль: ${options.profile}`);
+  }
 
   if (options.version) {
     stdout.write(`${VERSION}\n`);
@@ -72,12 +80,13 @@ function makeEngine(options) {
 }
 
 async function oneShot(engine, prompt, options) {
+  const selectedProfile = options.profile || (options.system ? 'custom' : 'auto');
   const messages = [
-    { role: 'system', content: options.system || DEFAULT_SYSTEM_PROMPT },
+    { role: 'system', content: systemPromptFor(selectedProfile, prompt, options.system) },
     { role: 'user', content: prompt },
   ];
   let streamed = '';
-  const result = await engine.generate(messages, generationFrom(options), (token) => {
+  const result = await engine.generate(messages, generationFrom(options, selectedProfile, prompt), (token) => {
     if (!options.json) {
       clearProgress();
       stdout.write(token);
@@ -100,12 +109,14 @@ async function oneShot(engine, prompt, options) {
 
 async function interactiveChat(engine, options) {
   const rl = createInterface({ input: stdin, output: stdout });
-  let systemPrompt = options.system || DEFAULT_SYSTEM_PROMPT;
-  let messages = [{ role: 'system', content: systemPrompt }];
+  let selectedProfile = options.profile || (options.system ? 'custom' : 'auto');
+  let customSystem = options.system || DEFAULT_SYSTEM_PROMPT;
+  let messages = [{ role: 'system', content: systemPromptFor(selectedProfile, '', options.system) }];
 
   stdout.write('\nЛокальный AI · данные остаются на устройстве\n');
   stdout.write(`Модель: ${engine.model.label} · ${engine.dtype} · ${engine.device}\n`);
-  stdout.write('Команды: /reset, /system текст, /save файл.json, /help, /exit\n\n');
+  stdout.write(`Профиль: ${selectedProfile}\n`);
+  stdout.write('Команды: /reset, /profile имя, /system текст, /save файл.json, /help, /exit\n\n');
 
   try {
     while (true) {
@@ -114,18 +125,30 @@ async function interactiveChat(engine, options) {
 
       if (input === '/exit' || input === '/quit') break;
       if (input === '/help') {
-        stdout.write('  /reset — очистить историю\n  /system ТЕКСТ — изменить системную инструкцию\n  /save ФАЙЛ — сохранить диалог\n  /exit — выйти\n');
+        stdout.write('  /reset — очистить историю\n  /profile auto|general|coding|rpg|creative|analysis|custom\n  /system ТЕКСТ — включить свою системную инструкцию и очистить историю\n  /save ФАЙЛ — сохранить диалог\n  /exit — выйти\n');
         continue;
       }
       if (input === '/reset') {
-        messages = [{ role: 'system', content: systemPrompt }];
+        messages = [{ role: 'system', content: systemPromptFor(selectedProfile, '', customSystem) }];
         stdout.write('История очищена.\n');
         continue;
       }
+      if (input.startsWith('/profile ')) {
+        const requested = input.slice(9).trim().toLowerCase();
+        if (!PROFILE_PRESETS.some((profile) => profile.id === requested)) {
+          stdout.write('Неизвестный профиль. Доступны: auto, general, coding, rpg, creative, analysis, custom.\n');
+          continue;
+        }
+        selectedProfile = requested;
+        messages = [{ role: 'system', content: systemPromptFor(selectedProfile, '', customSystem) }];
+        stdout.write(`Профиль ${selectedProfile}; история очищена.\n`);
+        continue;
+      }
       if (input.startsWith('/system ')) {
-        systemPrompt = input.slice(8).trim();
-        messages = [{ role: 'system', content: systemPrompt }];
-        stdout.write('Системная инструкция обновлена; история очищена.\n');
+        customSystem = input.slice(8).trim();
+        selectedProfile = 'custom';
+        messages = [{ role: 'system', content: customSystem }];
+        stdout.write('Своя системная инструкция включена; история очищена.\n');
         continue;
       }
       if (input.startsWith('/save ')) {
@@ -140,11 +163,15 @@ async function interactiveChat(engine, options) {
         continue;
       }
 
+      messages[0] = {
+        role: 'system',
+        content: systemPromptFor(selectedProfile, input, customSystem),
+      };
       messages.push({ role: 'user', content: input });
       stdout.write('\x1b[35mAI  ›\x1b[0m ');
       let streamed = '';
       try {
-        const result = await engine.generate(messages, generationFrom(options), (token) => {
+        const result = await engine.generate(messages, generationFrom(options, selectedProfile, input), (token) => {
           clearProgress();
           stdout.write(token);
           streamed += token;
@@ -205,10 +232,15 @@ async function runServer(options) {
   process.once('SIGTERM', stop);
 }
 
-function generationFrom(options) {
+function systemPromptFor(profile, prompt, customSystem) {
+  if (profile === 'custom' && customSystem) return customSystem;
+  return profileSystemPrompt(profile || 'auto', prompt, customSystem || DEFAULT_SYSTEM_PROMPT);
+}
+
+function generationFrom(options, profile = 'auto', prompt = '') {
   return {
     maxNewTokens: options.maxTokens || 256,
-    temperature: options.temperature ?? 0.7,
+    temperature: options.temperature ?? profileTemperature(profile, prompt),
     topP: options.topP ?? 0.9,
     repetitionPenalty: options.repetitionPenalty ?? 1.05,
   };
@@ -333,8 +365,9 @@ function helpText() {
       --offline             Запретить сетевые загрузки
       --threads <число>     Потоки CPU
   -n, --max-tokens <число> Максимум новых токенов (256)
-  -t, --temperature <0..2> Температура (0 = точный ответ, 0.7 по умолчанию)
-  -s, --system <текст>      Системная инструкция
+      --profile <имя>       auto | general | coding | rpg | creative | analysis | custom
+  -t, --temperature <0..2> Температура (иначе preset выбранного профиля)
+  -s, --system <текст>      Своя системная инструкция (включает custom без --profile)
       --json                JSON-ответ в одноразовом режиме
 
 Параметры сервера:

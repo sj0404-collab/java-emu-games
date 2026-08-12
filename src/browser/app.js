@@ -5,6 +5,10 @@ import {
   MODEL_PRESETS,
   resolveModel,
 } from '../shared/models.js';
+import {
+  profileSystemPrompt,
+  profileTemperature,
+} from '../shared/profiles.js';
 
 const STORAGE_KEY = 'local-ai-phone:v1';
 const worker = new Worker(new URL('./ai.worker.js', import.meta.url), { type: 'module' });
@@ -18,6 +22,7 @@ const state = {
     customModel: '',
     device: 'auto',
     dtype: '',
+    profile: 'auto',
     temperature: 0.7,
     maxTokens: 256,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -110,6 +115,9 @@ function bindEvents() {
   });
   elements.modelSelect.addEventListener('change', previewSettingsModel);
   elements.customModel.addEventListener('input', previewSettingsModel);
+  elements.profileSelect.addEventListener('change', () => {
+    elements.temperature.disabled = elements.profileSelect.value !== 'custom';
+  });
   elements.temperature.addEventListener('input', () => {
     elements.temperatureValue.value = Number(elements.temperature.value).toFixed(1);
   });
@@ -182,9 +190,9 @@ function submitPrompt(event) {
     type: 'generate',
     payload: {
       messages: state.messages.slice(0, -1),
-      systemPrompt: state.settings.systemPrompt,
+      systemPrompt: profileSystemPrompt(state.settings.profile, prompt, state.settings.systemPrompt),
       maxNewTokens: state.settings.maxTokens,
-      temperature: state.settings.temperature,
+      temperature: profileTemperature(state.settings.profile, prompt, state.settings.temperature),
       topP: 0.9,
     },
   });
@@ -394,6 +402,7 @@ function applySettings() {
     customModel,
     device: elements.deviceSelect.value,
     dtype: elements.dtypeSelect.value,
+    profile: elements.profileSelect.value,
     temperature: Number(elements.temperature.value),
     maxTokens: Math.max(16, Math.min(2048, Number(elements.maxTokens.value) || 256)),
     systemPrompt: elements.systemPrompt.value.trim() || DEFAULT_SYSTEM_PROMPT,
@@ -423,6 +432,7 @@ function eraseData() {
     customModel: '',
     device: 'auto',
     dtype: '',
+    profile: 'auto',
     temperature: 0.7,
     maxTokens: 256,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -476,7 +486,9 @@ function syncSettingsForm() {
   elements.customModelField.hidden = elements.modelSelect.value !== 'custom';
   elements.deviceSelect.value = state.settings.device;
   elements.dtypeSelect.value = state.settings.dtype;
+  elements.profileSelect.value = state.settings.profile || 'auto';
   elements.temperature.value = state.settings.temperature;
+  elements.temperature.disabled = elements.profileSelect.value !== 'custom';
   elements.temperatureValue.value = Number(state.settings.temperature).toFixed(1);
   elements.maxTokens.value = state.settings.maxTokens;
   elements.systemPrompt.value = state.settings.systemPrompt;
@@ -564,7 +576,7 @@ function collectElements() {
     'apply-settings', 'clear-button', 'composer', 'custom-model', 'custom-model-field',
     'device-select', 'dtype-select', 'erase-data', 'install-button', 'load-model-button',
     'load-progress', 'max-tokens', 'messages', 'model-description', 'model-select', 'progress-bar',
-    'progress-label', 'progress-value', 'prompt', 'runtime-dot', 'runtime-label', 'send-button',
+    'progress-label', 'progress-value', 'profile-select', 'prompt', 'runtime-dot', 'runtime-label', 'send-button',
     'settings-backdrop', 'settings-button', 'settings-close', 'settings-panel', 'stop-button',
     'system-prompt', 'temperature', 'temperature-value', 'toast', 'welcome',
     'welcome-model-meta', 'welcome-model-name',

@@ -160,10 +160,22 @@
             </select>
           </label>
         </div>
+        <label class="field">
+          <span>Профиль помощника</span>
+          <select id="profile-select">
+            <option value="auto">Авто · по смыслу запроса</option>
+            <option value="general">Обычный диалог</option>
+            <option value="coding">Кодинг</option>
+            <option value="rpg">D&amp;D / ролевая игра</option>
+            <option value="creative">Творчество</option>
+            <option value="analysis">Точный анализ</option>
+            <option value="custom">Только своя инструкция</option>
+          </select>
+        </label>
         <label class="field range-field">
           <span><span>Температура</span><output id="temperature-value">0.7</output></span>
           <input id="temperature" type="range" min="0" max="1.5" step="0.1" value="0.7" />
-          <small>0 — точнее, выше — разнообразнее</small>
+          <small>Используется профилем «Своя инструкция»; остальные профили выбирают безопасный preset</small>
         </label>
         <label class="field">
           <span>Максимум новых токенов</span>
@@ -172,6 +184,7 @@
         <label class="field">
           <span>Системная инструкция</span>
           <textarea id="system-prompt" rows="5">Ты полезный локальный ассистент. Отвечай точно, кратко и на языке пользователя. Если не знаешь ответ, честно скажи об этом.</textarea>
+          <small>Для готовых профилей это дополнительное предпочтение; профиль «Своя инструкция» использует только этот текст.</small>
         </label>
         <button id="apply-settings" class="primary-button full-button" type="button">Применить</button>
         <button id="erase-data" class="danger-button" type="button">Удалить историю и настройки</button>

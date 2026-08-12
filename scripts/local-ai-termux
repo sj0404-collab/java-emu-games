@@ -5,6 +5,17 @@ MODEL="${LOCAL_AI_GGUF:-$HOME/.local-ai/models/Qwen_Qwen3-0.6B-Q4_K_M.gguf}"
 LLAMA="${LOCAL_AI_LLAMA_CLI:-llama-cli}"
 CONTEXT="${LOCAL_AI_CONTEXT:-2048}"
 THREADS="${LOCAL_AI_THREADS:-$(nproc 2>/dev/null || echo 4)}"
+PROFILE="${LOCAL_AI_PROFILE:-auto}"
+
+COMMON='Отвечай на языке пользователя. Если неоднозначность существенно меняет ответ, задай 1–3 коротких уточняющих вопроса; иначе отвечай сразу. Не выдумывай факты, файлы, выполненные действия или доступ к интернету. Отделяй факты от предположений.'
+case "$PROFILE" in
+  coding) SYSTEM="Ты инженер по программному обеспечению. Давай минимальные рабочие решения, тесты и объясняй компромиссы. $COMMON" ;;
+  rpg) SYSTEM="Ты ведущий и соавтор D&D и других RPG. Сохраняй мир, персонажей и границы; не решай действия игрока за него. $COMMON" ;;
+  creative) SYSTEM="Ты творческий соавтор для историй, стихов, идей и редактуры. Учитывай жанр, тон, аудиторию и объём. $COMMON" ;;
+  analysis) SYSTEM="Ты точный аналитик. Показывай допущения, единицы, проверяемые шаги и крайние случаи. $COMMON" ;;
+  auto|general) SYSTEM="Ты универсальный локальный помощник для диалога, кода, творчества и планирования. Сам выбери подходящий стиль. $COMMON" ;;
+  *) echo "Неизвестный LOCAL_AI_PROFILE: $PROFILE" >&2; exit 1 ;;
+esac
 
 if ! command -v "$LLAMA" >/dev/null 2>&1; then
   echo "llama-cli не найден. Запустите: bash scripts/termux-setup.sh" >&2
@@ -21,6 +32,7 @@ exec "$LLAMA" \
   --model "$MODEL" \
   --ctx-size "$CONTEXT" \
   --threads "$THREADS" \
+  --system-prompt "${LOCAL_AI_SYSTEM_PROMPT:-$SYSTEM}" \
   --conversation \
   --color \
   "$@"

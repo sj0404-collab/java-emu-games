@@ -16,7 +16,9 @@
 - устанавливаемая PWA с service worker и локальными assets;
 - Node.js CLI для интерактивного и одноразового режима;
 - OpenAI-совместимый локальный HTTP API с SSE;
+- маленький нативный Android APK без встроенной модели: импорт GGUF через SAF, streaming, TTS и системный голосовой ввод;
 - отдельный нативный launcher для Termux через `llama.cpp`;
+- Auto и явные ситуационные профили для диалога, кода, D&D/RPG, творчества и точного анализа;
 - offline mode, файловый кэш и локальный каталог ONNX-весов;
 - никаких web-fonts, аналитики и внешних frontend-скриптов.
 
@@ -109,9 +111,21 @@ local-ai chat \
 
 Путь должен содержать полную структуру model repository: конфиги, tokenizer и каталог `onnx/`, а не только один `.onnx` файл.
 
-Команды интерактивного режима: `/reset`, `/system текст`, `/save файл.json`, `/help`, `/exit`. Все параметры: `local-ai --help`.
+Профиль выбирается параметром `--profile auto|general|coding|rpg|creative|analysis|custom`. Auto подстраивается под текущий запрос; `--system` без `--profile` сохраняет прежнее поведение и включает custom. Команды интерактивного режима: `/reset`, `/profile имя`, `/system текст`, `/save файл.json`, `/help`, `/exit`. Все параметры: `local-ai --help`.
 
-## Termux / Android
+## Нативный Android APK
+
+Каталог [`android/`](android/) содержит отдельное приложение на Java/JNI + `llama.cpp`. APK не включает сотни мегабайт весов и не запрашивает интернет/storage permissions: пользователь выбирает одиночный GGUF на телефоне либо USB-флешке через Android SAF. Модель читается без второй постоянной копии.
+
+```bash
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_HOME="$HOME/android-sdk"
+bash scripts/build-apk.sh
+```
+
+Нужны Android SDK 35, NDK `27.2.12479018` и CMake `3.22.1`. Артефакт и SHA-256 экспортируются в `artifacts/`. Рекомендуемый экономичный файл — Qwen3 0.6B Q4_K_M (~484 МБ); архив `.tar.xz` перед выбором требуется распаковать. Подробности, подпись APK и ограничения памяти: [android/README.md](android/README.md).
+
+## Termux / Android shell
 
 В Termux **не запускайте `npm install` этого проекта**: `onnxruntime-node` поддерживает Linux ARM64 с glibc, но не Android с Bionic. Включён независимый установщик `llama.cpp` + Qwen3 0.6B `Q4_K_M` GGUF (484 МБ).
 
@@ -129,11 +143,13 @@ local-ai-termux
 3. скачивает GGUF в `~/.local-ai/models/` с возможностью продолжить прерванную загрузку;
 4. устанавливает команду `local-ai-termux` в `$PREFIX/bin`.
 
-Настройка памяти и потоков:
+Настройка памяти, потоков и профиля:
 
 ```bash
-LOCAL_AI_CONTEXT=1024 LOCAL_AI_THREADS=4 local-ai-termux
+LOCAL_AI_CONTEXT=1024 LOCAL_AI_THREADS=4 LOCAL_AI_PROFILE=coding local-ai-termux
 ```
+
+`LOCAL_AI_PROFILE`: `auto`, `general`, `coding`, `rpg`, `creative` или `analysis`. Произвольную инструкцию можно передать через `LOCAL_AI_SYSTEM_PROMPT`.
 
 Другой локальный GGUF:
 
@@ -192,6 +208,8 @@ curl http://PHONE_OR_PC:3928/v1/models \
 | `LOCAL_AI_API_KEY` | Bearer key для `/v1/*` |
 | `LOCAL_AI_GGUF` | путь к модели Termux |
 | `LOCAL_AI_CONTEXT` | размер контекста Termux |
+| `LOCAL_AI_PROFILE` | ситуационный профиль Termux |
+| `LOCAL_AI_SYSTEM_PROMPT` | своя системная инструкция Termux |
 | `LOCAL_AI_LLAMA_CLI` | другое имя/путь `llama-cli` |
 
 ## Разработка и проверка
@@ -222,8 +240,9 @@ src/browser/ai.worker.js Transformers.js, WebGPU/WASM, streaming
 src/node/engine.js       Node ONNX engine и очередь генераций
 src/node/cli.js          терминальный интерфейс
 src/node/server.js       HTTP/SSE API и static server
-src/shared/              общие модели и chat validation
-scripts/                 отдельный Termux/GGUF runtime
+src/shared/              общие модели, профили и chat validation
+android/                 нативный Android APK, JNI и llama.cpp build
+scripts/                 Android build и отдельный Termux/GGUF runtime
 public/                  manifest, service worker, локальные icons
 ```
 
