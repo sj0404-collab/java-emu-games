@@ -1,5 +1,15 @@
 skills/
 node_modules/
+dist/
+.local-ai/
+models/
+*.onnx
+*.onnx_data
+*.gguf
 android-sdk/
 build_log*.txt
 *.apk
+android/.gradle/
+android/local.properties
+android/app/build/
+android/vendor/

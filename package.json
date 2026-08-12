@@ -1,0 +1,46 @@
+{
+  "name": "local-ai-phone",
+  "version": "0.1.0",
+  "description": "Локальный ONNX-ассистент для телефона, браузера, ПК и Termux",
+  "type": "module",
+  "private": true,
+  "files": [
+    "dist/",
+    "public/",
+    "scripts/local-ai-termux",
+    "scripts/termux-setup.sh",
+    "src/",
+    "index.html",
+    "vite.config.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "local-ai": "./src/node/cli.js"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "build:runner": "NODE_OPTIONS=--max-old-space-size=3072 vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "chat": "node ./src/node/cli.js chat",
+    "serve": "node ./src/node/cli.js serve",
+    "test": "node --test",
+    "check": "node --check src/node/cli.js && node --check src/node/engine.js && node --check src/node/server.js && node --check src/browser/app.js && node --check src/browser/ai.worker.js",
+    "ci": "npm run check && npm test && npm run build:runner"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0"
+  },
+  "devDependencies": {
+    "vite": "7.3.6"
+  },
+  "overrides": {
+    "adm-zip": "0.6.0",
+    "sharp": "0.35.3"
+  },
+  "license": "MIT"
+}

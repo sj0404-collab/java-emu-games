@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#11130f" />
+    <meta name="description" content="Локальный ONNX AI-ассистент: работает прямо на телефоне или ПК, без отправки переписки в облако." />
+    <link rel="icon" href="./local-ai.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./local-ai.svg" />
+    <title>Локальный AI</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Локальный AI — главная">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32"><path d="M9 6.5h14A2.5 2.5 0 0 1 25.5 9v14a2.5 2.5 0 0 1-2.5 2.5H9A2.5 2.5 0 0 1 6.5 23V9A2.5 2.5 0 0 1 9 6.5Z"/><path d="M11 15.8h10M13 11.5v8.7m6-8.7v8.7M11 3.5v3m10-3v3M11 25.5v3m10-3v3M3.5 11h3m-3 10h3m19-10h3m-3 10h3"/></svg>
+          </span>
+          <span>
+            <strong>Локальный AI</strong>
+            <small>ONNX · на устройстве</small>
+          </span>
+        </a>
+        <div class="top-actions">
+          <span class="privacy-badge" title="Текст обрабатывается на этом устройстве">
+            <span class="privacy-dot"></span>
+            <span class="privacy-long">Данные не уходят в облако</span>
+            <span class="privacy-short">Локально</span>
+          </span>
+          <button id="install-button" class="icon-button install-button" type="button" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg>
+            <span>Установить</span>
+          </button>
+          <button id="settings-button" class="icon-button" type="button" aria-label="Настройки" aria-controls="settings-panel" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="m19.4 15 .1.1 1.2 2.1-2.2 2.2-2.2-1.3-.2-.1a8 8 0 0 1-2.2.9l-.2.1-.6 2.5H9l-.6-2.5-.1-.2a8 8 0 0 1-2.2-.9l-.2-.1-2.2 1.3-2.2-2.2 1.3-2.2-.1-.2a8 8 0 0 1-.9-2.2v-.2L-.7 12l.6-3.1 2.5-.6.1-.2A8 8 0 0 1 3.4 6l.1-.2-1.3-2.2 2.2-2.2 2.2 1.3.2-.1A8 8 0 0 1 9 1.8h.2L9.8-.7h3.1l.6 2.5h.2a8 8 0 0 1 2.2.9l.2.1 2.2-1.3 2.2 2.2-1.3 2.2.1.2a8 8 0 0 1 .9 2.2v.2l2.5.6-.6 3.1-2.5.6-.1.2a8 8 0 0 1-.9 2.2l-.1.2Z" transform="translate(0.7 0.7) scale(.94)"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section id="chat" class="chat" aria-live="polite">
+          <div id="welcome" class="welcome">
+            <div class="eyebrow"><span></span> Частный AI без подписки</div>
+            <h1>Ваш ассистент.<br /><em>Только ваш.</em></h1>
+            <p>Модель запускается прямо на этом устройстве через ONNX. После первой загрузки можно отключить интернет.</p>
+
+            <div class="model-spotlight">
+              <div class="model-icon" aria-hidden="true">Q3</div>
+              <div class="model-copy">
+                <span class="overline">Выбрана модель</span>
+                <strong id="welcome-model-name">Qwen3 0.6B · телефон</strong>
+                <small id="welcome-model-meta">≈570 МБ · RAM от 2 ГБ</small>
+              </div>
+              <button id="load-model-button" class="primary-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg>
+                <span>Загрузить модель</span>
+              </button>
+            </div>
+
+            <div id="load-progress" class="load-progress" hidden>
+              <div class="progress-copy">
+                <span id="progress-label">Подготовка модели…</span>
+                <strong id="progress-value">0%</strong>
+              </div>
+              <div class="progress-track"><span id="progress-bar"></span></div>
+              <small>Не закрывайте вкладку. Файл сохранится в кэше браузера.</small>
+            </div>
+
+            <div class="starter-grid" aria-label="Примеры запросов">
+              <button class="starter" type="button" data-prompt="Объясни простыми словами, как работает локальная языковая модель.">
+                <span class="starter-icon mint">Aa</span>
+                <span><strong>Объяснить тему</strong><small>Просто и по шагам</small></span>
+                <span class="arrow">↗</span>
+              </button>
+              <button class="starter" type="button" data-prompt="Напиши короткий план продуктивного дня без перегрузки.">
+                <span class="starter-icon sand">✓</span>
+                <span><strong>Составить план</strong><small>Дела, учёба, идеи</small></span>
+                <span class="arrow">↗</span>
+              </button>
+              <button class="starter" type="button" data-prompt="Напиши на JavaScript функцию бинарного поиска и объясни код.">
+                <span class="starter-icon violet">&lt;/&gt;</span>
+                <span><strong>Помочь с кодом</strong><small>Локально и приватно</small></span>
+                <span class="arrow">↗</span>
+              </button>
+            </div>
+          </div>
+          <div id="messages" class="messages"></div>
+        </section>
+
+        <div class="composer-wrap">
+          <form id="composer" class="composer">
+            <label class="sr-only" for="prompt">Сообщение</label>
+            <textarea id="prompt" rows="1" maxlength="12000" placeholder="Спросите что-нибудь…" disabled></textarea>
+            <div class="composer-bottom">
+              <div class="runtime-status">
+                <span id="runtime-dot" class="status-dot"></span>
+                <span id="runtime-label">Модель не загружена</span>
+              </div>
+              <div class="composer-actions">
+                <button id="clear-button" class="clear-button" type="button" title="Очистить диалог" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5"/></svg>
+                </button>
+                <button id="stop-button" class="send-button stop-button" type="button" title="Остановить" hidden>
+                  <span></span>
+                </button>
+                <button id="send-button" class="send-button" type="submit" title="Отправить" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4.5 14-3-5.5L5 12Zm6.5 1.5L19 5"/></svg>
+                </button>
+              </div>
+            </div>
+          </form>
+          <p class="disclaimer">Маленькие локальные модели могут ошибаться. Проверяйте важную информацию.</p>
+        </div>
+      </main>
+    </div>
+
+    <div id="settings-backdrop" class="backdrop" hidden></div>
+    <aside id="settings-panel" class="settings-panel" aria-hidden="true" aria-labelledby="settings-title">
+      <div class="settings-head">
+        <div><span class="overline">Конфигурация</span><h2 id="settings-title">Настройки</h2></div>
+        <button id="settings-close" class="icon-button" type="button" aria-label="Закрыть настройки">×</button>
+      </div>
+      <div class="settings-body">
+        <label class="field">
+          <span>Модель</span>
+          <select id="model-select">
+            <option value="phone">Qwen3 0.6B · телефон</option>
+            <option value="mini">SmolLM2 360M · слабый телефон</option>
+            <option value="quality">Qwen3 1.7B · качество</option>
+            <option value="coder">Qwen2.5 Coder 0.5B · код</option>
+            <option value="custom">Своя ONNX-модель…</option>
+          </select>
+        </label>
+        <label id="custom-model-field" class="field" hidden>
+          <span>Hugging Face model ID</span>
+          <input id="custom-model" type="text" placeholder="owner/model-with-onnx" spellcheck="false" />
+        </label>
+        <div id="model-description" class="info-card">
+          <strong>Многоязычный баланс скорости и качества</strong>
+          <span>0.6B параметров · ≈570 МБ · RAM от 2 ГБ</span>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Ускорение</span>
+            <select id="device-select">
+              <option value="auto">Авто</option>
+              <option value="webgpu">WebGPU</option>
+              <option value="wasm">CPU / WASM</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Точность весов</span>
+            <select id="dtype-select">
+              <option value="">Авто</option>
+              <option value="q4f16">Q4F16</option>
+              <option value="q4">Q4</option>
+              <option value="q8">Q8</option>
+              <option value="fp16">FP16</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Профиль помощника</span>
+          <select id="profile-select">
+            <option value="auto">Авто · по смыслу запроса</option>
+            <option value="general">Обычный диалог</option>
+            <option value="coding">Кодинг</option>
+            <option value="rpg">D&amp;D / ролевая игра</option>
+            <option value="creative">Творчество</option>
+            <option value="analysis">Точный анализ</option>
+            <option value="custom">Только своя инструкция</option>
+          </select>
+        </label>
+        <label class="field range-field">
+          <span><span>Температура</span><output id="temperature-value">0.7</output></span>
+          <input id="temperature" type="range" min="0" max="1.5" step="0.1" value="0.7" />
+          <small>Используется профилем «Своя инструкция»; остальные профили выбирают безопасный preset</small>
+        </label>
+        <label class="field">
+          <span>Максимум новых токенов</span>
+          <input id="max-tokens" type="number" min="16" max="2048" step="16" value="256" inputmode="numeric" />
+        </label>
+        <label class="field">
+          <span>Системная инструкция</span>
+          <textarea id="system-prompt" rows="5">Ты полезный локальный ассистент. Отвечай точно, кратко и на языке пользователя. Если не знаешь ответ, честно скажи об этом.</textarea>
+          <small>Для готовых профилей это дополнительное предпочтение; профиль «Своя инструкция» использует только этот текст.</small>
+        </label>
+        <button id="apply-settings" class="primary-button full-button" type="button">Применить</button>
+        <button id="erase-data" class="danger-button" type="button">Удалить историю и настройки</button>
+      </div>
+      <div class="settings-foot">
+        <span class="shield">◇</span>
+        <p><strong>Приватность по умолчанию</strong><br />Запросы обрабатываются внутри браузера. Сеть нужна только для скачивания ONNX-весов.</p>
+      </div>
+    </aside>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script type="module" src="/src/browser/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.localai.phone'
+    compileSdk 35
+    ndkVersion '27.2.12479018'
+
+    defaultConfig {
+        applicationId 'com.localai.phone'
+        minSdk 26
+        targetSdk 35
+        versionCode 2
+        versionName '0.2.0'
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+        externalNativeBuild {
+            cmake {
+                cppFlags '-O3 -DNDEBUG -fvisibility=hidden -ffunction-sections -fdata-sections'
+                arguments '-DANDROID_STL=c++_shared',
+                    '-DCMAKE_BUILD_TYPE=Release',
+                    '-DBUILD_SHARED_LIBS=OFF',
+                    '-DLLAMA_BUILD_TESTS=OFF',
+                    '-DLLAMA_BUILD_EXAMPLES=OFF',
+                    '-DLLAMA_BUILD_SERVER=OFF',
+                    '-DLLAMA_BUILD_TOOLS=OFF',
+                    '-DLLAMA_BUILD_APP=OFF',
+                    '-DLLAMA_BUILD_UI=OFF',
+                    '-DLLAMA_BUILD_COMMON=ON',
+                    '-DLLAMA_OPENSSL=OFF',
+                    '-DLLAMA_SUBPROCESS=OFF',
+                    '-DGGML_OPENMP=OFF',
+                    '-DGGML_NATIVE=OFF',
+                    '-DGGML_LLAMAFILE=OFF',
+                    '-DGGML_BACKEND_DL=OFF',
+                    '-DGGML_CPU_ALL_VARIANTS=OFF'
+            }
+        }
+    }
+
+    signingConfigs {
+        localRelease {
+            storeFile file(System.getenv('LOCAL_AI_KEYSTORE') ?: "${System.getProperty('user.home')}/.android/debug.keystore")
+            storePassword System.getenv('LOCAL_AI_STORE_PASSWORD') ?: 'android'
+            keyAlias System.getenv('LOCAL_AI_KEY_ALIAS') ?: 'androiddebugkey'
+            keyPassword System.getenv('LOCAL_AI_KEY_PASSWORD') ?: 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            signingConfig signingConfigs.localRelease
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+        resources {
+            excludes += ['META-INF/**']
+        }
+    }
+}
